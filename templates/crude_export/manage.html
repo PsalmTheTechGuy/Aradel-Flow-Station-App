@@ -1,0 +1,492 @@
+{% extends 'crude_export/base.html' %}
+
+{% block title %}Manage Data - Crude Export Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .manage-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .table-container {
+        background: white;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+    .table thead th {
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        padding: 1.25rem 1rem;
+    }
+    .table td {
+        padding: 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .dest-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        display: inline-block;
+    }
+    .bg-tnp { background: rgba(0, 0, 255, 0.1); color: #0000FF; }
+    .bg-ing { background: rgba(0, 128, 0, 0.1); color: #008000; }
+    .bg-ace { background: rgba(0, 206, 209, 0.1); color: #008080; }
+    .bg-int { background: rgba(255, 0, 0, 0.1); color: #FF0000; }
+    .bg-ref { background: rgba(128, 0, 128, 0.1); color: #800080; }
+    
+    .action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    .action-btn:hover {
+        background: var(--primary);
+        color: white;
+    }
+    .action-btn.delete:hover {
+        background: #ef4444;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    
+    .bulk-actions {
+        display: none;
+        background: #1e293b;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        animation: slideInDown 0.3s ease;
+    }
+    @keyframes slideInDown {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    .form-control, .form-select {
+        border-radius: 10px;
+        border: 2px solid #f1f5f9;
+    }
+    .form-control:focus { border-color: var(--accent); box-shadow: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="manage-container fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Data Management</h2>
+            <p class="text-muted mb-0">View, edit, and bulk manage your export records</p>
+        </div>
+        <a href="/crude-export/entry" class="btn btn-accent">
+            <i class="fas fa-plus me-2"></i>New Entry
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase">Month</label>
+                <select class="form-select" id="monthFilter">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted text-uppercase">Year</label>
+                <select class="form-select" id="yearFilter">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase">Destination</label>
+                <select class="form-select" id="destFilter">
+                    <option value="ALL">All Destinations</option>
+                    <option value="TNP">TNP</option>
+                    <option value="INGENTIA">INGENTIA</option>
+                    <option value="ACE">ACE</option>
+                    <option value="INTESSA">INTESSA</option>
+                    <option value="REFINERY">DAILY REFINERY FEED</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100 py-2" onclick="loadData()">
+                    <i class="fas fa-filter me-2"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div class="bulk-actions d-flex justify-content-between align-items-center" id="bulkBar">
+        <span><span id="selectedCount">0</span> records selected</span>
+        <button class="btn btn-danger btn-sm" onclick="bulkDelete()">
+            <i class="fas fa-trash-alt me-2"></i>Delete Selected
+        </button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" class="form-check-input" id="selectAll">
+                    </th>
+                    <th>Date</th>
+                    <th>Destination</th>
+                    <th>Volume (BBLS)</th>
+                    <th>Remarks</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="dataTableBody">
+                <!-- Rows loaded via JS -->
+            </tbody>
+        </table>
+        <div id="noData" class="text-center py-5 d-none">
+            <i class="fas fa-folder-open text-muted fs-1 mb-3"></i>
+            <p class="text-muted">No records found for this period</p>
+        </div>
+        <div id="loading" class="text-center py-5">
+            <div class="spinner-border text-accent" role="status"></div>
+            <p class="text-muted mt-2">Loading records...</p>
+        </div>
+        
+        <!-- Pagination Footer -->
+        <div class="bg-light p-3 border-top d-flex justify-content-between align-items-center" id="paginationFooter">
+            <div class="text-muted small">
+                Showing <span id="startRange">0</span>-<span id="endRange">0</span> of <span id="totalRecords">0</span>
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0" id="paginationList">
+                    <!-- Dynamic buttons -->
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 24px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Edit Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editForm">
+                    <input type="hidden" id="editId">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">DATE</label>
+                        <input type="date" class="form-control" id="editDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">DESTINATION</label>
+                        <select class="form-select" id="editDest" required>
+                            <option value="TNP">TNP</option>
+                            <option value="INGENTIA">INGENTIA</option>
+                            <option value="ACE">ACE</option>
+                            <option value="INTESSA">INTESSA</option>
+                            <option value="REFINERY">DAILY REFINERY FEED</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">VOLUME (BBLS)</label>
+                        <input type="number" step="0.01" class="form-control" id="editVolume" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">REMARKS</label>
+                        <textarea class="form-control" id="editRemarks" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-accent w-100 py-3 mt-2" id="updateBtn">
+                        <i class="fas fa-save me-2"></i>Update Record
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let editModal;
+    let records = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        editModal = new bootstrap.Modal(document.getElementById('editModal'));
+        const now = new Date();
+        document.getElementById('monthFilter').value = now.getMonth() + 1;
+        document.getElementById('yearFilter').value = now.getFullYear();
+        
+        loadData();
+
+        // Select all listener
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const checks = document.querySelectorAll('.row-check');
+            checks.forEach(c => c.checked = this.checked);
+            updateBulkBar();
+        });
+    });
+
+    let currentPage = 1;
+
+    async function loadData(page = 1) {
+        currentPage = page;
+        const month = document.getElementById('monthFilter').value;
+        const year = document.getElementById('yearFilter').value;
+        const destination = document.getElementById('destFilter').value;
+        
+        document.getElementById('loading').classList.remove('d-none');
+        document.getElementById('dataTableBody').innerHTML = '';
+        document.getElementById('noData').classList.add('d-none');
+        document.getElementById('bulkBar').style.display = 'none';
+        document.getElementById('selectAll').checked = false;
+        document.getElementById('paginationFooter').style.display = 'none';
+
+        try {
+            const res = await fetch(`/api/crude-export/list?month=${month}&year=${year}&destination=${destination}&page=${page}&per_page=10`, {
+                headers: getHeaders()
+            });
+            const data = await handleResponse(res);
+            records = data.items;
+
+            if (records.length === 0) {
+                document.getElementById('noData').classList.remove('d-none');
+            } else {
+                renderTable();
+                renderPagination(data);
+            }
+        } catch (err) {
+            Swal.fire('Error', 'Failed to load data', 'error');
+        } finally {
+            document.getElementById('loading').classList.add('d-none');
+        }
+    }
+
+    function renderPagination(data) {
+        const footer = document.getElementById('paginationFooter');
+        footer.style.display = 'flex';
+        
+        const start = (data.current_page - 1) * data.per_page + 1;
+        const end = Math.min(start + data.items.length - 1, data.total);
+        
+        document.getElementById('startRange').textContent = start;
+        document.getElementById('endRange').textContent = end;
+        document.getElementById('totalRecords').textContent = data.total;
+        
+        let html = '';
+        // Prev
+        html += `<li class="page-item ${data.current_page === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadData(${data.current_page - 1})"><i class="fas fa-chevron-left"></i></a>
+        </li>`;
+        
+        // Pages
+        for (let i = 1; i <= data.pages; i++) {
+            html += `<li class="page-item ${i === data.current_page ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadData(${i})">${i}</a>
+            </li>`;
+        }
+        
+        // Next
+        html += `<li class="page-item ${data.current_page === data.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadData(${data.current_page + 1})"><i class="fas fa-chevron-right"></i></a>
+        </li>`;
+        
+        document.getElementById('paginationList').innerHTML = html;
+    }
+
+    function renderTable() {
+        const body = document.getElementById('dataTableBody');
+        body.innerHTML = records.map(r => `
+            <tr id="row-${r.id}">
+                <td>
+                    <input type="checkbox" class="form-check-input row-check" value="${r.id}" onchange="updateBulkBar()">
+                </td>
+                <td class="fw-bold">${new Date(r.date).toLocaleDateString()}</td>
+                <td>
+                    <span class="dest-badge bg-${getDestClass(r.destination)}">
+                        ${r.destination}
+                    </span>
+                </td>
+                <td class="fw-bold">${r.volume.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                <td class="text-muted small">${r.remarks || '-'}</td>
+                <td class="text-end">
+                    <button class="action-btn me-1" onclick="openEdit(${r.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-btn delete" onclick="deleteSingle(${r.id})">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function getDestClass(dest) {
+        if (dest === 'TNP') return 'tnp';
+        if (dest === 'INGENTIA') return 'ing';
+        if (dest === 'ACE') return 'ace';
+        if (dest === 'INTESSA') return 'int';
+        if (dest === 'REFINERY') return 'ref';
+        return 'secondary';
+    }
+
+    function updateBulkBar() {
+        const checked = document.querySelectorAll('.row-check:checked');
+        const bar = document.getElementById('bulkBar');
+        if (checked.length > 0) {
+            bar.style.display = 'flex';
+            document.getElementById('selectedCount').textContent = checked.length;
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    async function deleteSingle(id) {
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: "This will permanently delete this record.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, delete it'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`/api/crude-export/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                if (res.ok) {
+                    Swal.fire('Deleted!', 'Record has been removed.', 'success');
+                    loadData();
+                }
+            } catch (err) {
+                Swal.fire('Error', 'Delete failed', 'error');
+            }
+        }
+    }
+
+    async function bulkDelete() {
+        const checked = Array.from(document.querySelectorAll('.row-check:checked')).map(c => parseInt(c.value));
+        
+        const result = await Swal.fire({
+            title: `Delete ${checked.length} records?`,
+            text: "This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, delete all'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch('/api/crude-export/bulk-delete', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ ids: checked })
+                });
+                if (res.ok) {
+                    Swal.fire('Success', `Deleted ${checked.length} records`, 'success');
+                    loadData();
+                }
+            } catch (err) {
+                Swal.fire('Error', 'Bulk delete failed', 'error');
+            }
+        }
+    }
+
+    function openEdit(id) {
+        const r = records.find(x => x.id === id);
+        if (!r) return;
+        
+        document.getElementById('editId').value = r.id;
+        document.getElementById('editDate').value = r.date;
+        document.getElementById('editDest').value = r.destination;
+        document.getElementById('editVolume').value = r.volume;
+        document.getElementById('editRemarks').value = r.remarks || '';
+        
+        editModal.show();
+    }
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editId').value;
+        const btn = document.getElementById('updateBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+
+        const payload = {
+            date: document.getElementById('editDate').value,
+            destination: document.getElementById('editDest').value,
+            volume: document.getElementById('editVolume').value,
+            remarks: document.getElementById('editRemarks').value
+        };
+
+        try {
+            const res = await fetch(`/api/crude-export/${id}`, {
+                method: 'PUT',
+                headers: getHeaders(),
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                editModal.hide();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Updated!',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+                loadData();
+            } else {
+                const data = await res.json();
+                Swal.fire('Error', data.error || 'Update failed', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Error', 'Connection failed', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-2"></i>Update Record';
+        }
+    });
+</script>
+{% endblock %}

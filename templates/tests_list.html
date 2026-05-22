@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}Tests List - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1"><i class="fas fa-clipboard-list me-2 text-primary"></i>All Well Tests</h3>
+            <p class="text-muted mb-0">View and manage all well test records</p>
+        </div>
+        <a href="{{ url_for('dashboard.new_test') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>New Test
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search by test ID..." value="{{ search }}" oninput="debounceSearch()">
+                </div>
+                <div class="col-md-3">
+                    <select id="wellFilter" class="form-select" onchange="filterTests()">
+                        <option value="">All Wells</option>
+                        {% for w in wells %}
+                        <option value="{{ w.id }}"{% if selected_well_id == w.id %} selected{% endif %}>{{ w.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" id="startDate" class="form-control" value="{{ start_date }}" onchange="filterTests()">
+                </div>
+                <div class="col-md-2">
+                    <input type="date" id="endDate" class="form-control" value="{{ end_date }}" onchange="filterTests()">
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('dashboard.list_tests') }}" class="btn btn-outline-secondary w-100">Reset</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card table-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Tests ({{ tests|length }})</span>
+        </div>
+        <div class="card-body p-0">
+            <table class="table data-table">
+                <thead>
+                    <tr>
+                        <th>Test ID</th>
+                        <th>Well</th>
+                        <th>Date</th>
+                        <th>Gross (bbl)</th>
+                        <th>Net (bbl)</th>
+                        <th>BS&W (%)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tests %}
+                    <tr class="test-row" data-well-id="{{ t.well_id }}" data-date="{{ t.date }}">
+                        <td><span class="badge bg-primary">{{ t.test_id }}</span></td>
+                        <td>{{ t.well_name }}</td>
+                        <td>{{ t.date }}</td>
+                        <td><strong>{{ "%.1f"|format(t.gross) }}</strong></td>
+                        <td>{{ "%.1f"|format(t.net) }}</td>
+                        <td>
+                            <span class="status-badge {{ 'status-active' if t.avg_bsw < 50 else 'status-inactive' }}">
+                                {{ "%.1f"|format(t.avg_bsw) }}%
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('dashboard.view_test', id=t.id) }}" class="btn btn-icon btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let searchTimeout;
+
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const search = document.getElementById('searchInput').value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('search', search);
+        window.location.href = url.toString();
+    }, 500);
+}
+
+function filterTests() {
+    const wellId = document.getElementById('wellFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    document.querySelectorAll('.test-row').forEach(row => {
+        const rowWellId = parseInt(row.getAttribute('data-well-id'));
+        const rowDate = row.getAttribute('data-date');
+        let show = true;
+        if (wellId && rowWellId != wellId) show = false;
+        if (startDate && rowDate < startDate) show = false;
+        if (endDate && rowDate > endDate) show = false;
+        row.style.display = show ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

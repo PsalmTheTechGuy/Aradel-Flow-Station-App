@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0">Database Backup System</h3>
+            <p class="text-muted small">Manage manual and automated backups for ExportTracker Pro.</p>
+        </div>
+        <a href="/settings" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Settings
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm" style="border-top: 4px solid #b2000f;">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-database text-muted mb-3" style="font-size: 4rem;"></i>
+                    <h4 class="fw-bold">Manual Backup</h4>
+                    <p class="text-muted mb-4">Instantly download a secure, encrypted copy of your current database to your local computer.</p>
+                    
+                    <div class="d-flex justify-content-center mb-4">
+                        <div class="bg-light rounded p-3 text-start d-inline-block border">
+                            <div class="mb-1"><strong>Database Size:</strong> {{ "%.2f"|format(db_size) }} MB</div>
+                            <div><strong>Last Modified:</strong> {{ last_modified }}</div>
+                        </div>
+                    </div>
+
+                    <a href="#" onclick="downloadWithToken(event)" class="btn btn-lg w-75 fw-bold" style="background-color: #b2000f; color: white;">
+                        <i class="fas fa-download me-2"></i> Download Latest Backup
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm" style="border-top: 4px solid #0dcaf0;">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-history me-2 text-info"></i> Automated Backup Log</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Size</th>
+                                    <th>Date Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if backups %}
+                                    {% for b in backups %}
+                                    <tr>
+                                        <td><code class="text-dark">{{ b.name }}</code></td>
+                                        <td>{{ "%.2f"|format(b.size) }} MB</td>
+                                        <td>{{ b.date }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <i class="fas fa-info-circle mb-2 fs-4"></i><br>
+                                            No automated backups found yet.<br>
+                                            <small>The background service creates a backup every 24 hours.</small>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-muted small text-center">
+                    <i class="fas fa-sync fa-spin me-1"></i> Background daemon is running. Backups older than 30 days are auto-deleted.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function downloadWithToken(e) {
+        e.preventDefault();
+        const token = localStorage.getItem('token');
+        if(!token) {
+            alert("Authentication token missing. Please log in again.");
+            return;
+        }
+        window.location.href = `/settings/backup/download?token=${token}`;
+    }
+</script>
+{% endblock %}

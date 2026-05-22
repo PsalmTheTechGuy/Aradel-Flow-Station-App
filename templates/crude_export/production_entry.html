@@ -1,0 +1,131 @@
+{% extends 'crude_export/base.html' %}
+
+{% block title %}Production Entry - Flowstation Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .entry-form {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .form-control, .form-select {
+        border-radius: 12px;
+        padding: 0.8rem 1rem;
+        border: 2px solid #e2e8f0;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px rgba(178, 0, 15, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="mb-5 text-center">
+        <h2 class="fw-bold">Daily Production Entry</h2>
+        <p class="text-muted">Record 24-hour oil, water, and gas production volumes</p>
+    </div>
+
+    <div class="glass-card entry-form">
+        <form id="prodForm">
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Production Date</label>
+                <input type="date" class="form-control" id="prodDate" required>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <label class="form-label fw-bold small text-uppercase">Net Oil Production (24h)</label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" class="form-control fs-4 fw-bold" id="oilVolume" placeholder="0.00" required>
+                        <span class="input-group-text">BBLS</span>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <label class="form-label fw-bold small text-uppercase">Total Water Production (24h)</label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" class="form-control fs-4 fw-bold" id="waterVolume" placeholder="0.00" required>
+                        <span class="input-group-text">BBLS</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Gas Volume (Optional)</label>
+                <div class="input-group">
+                    <input type="number" step="0.01" class="form-control" id="gasVolume" placeholder="0.00">
+                    <span class="input-group-text">MSCF</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Remarks (Optional)</label>
+                <textarea class="form-control" id="prodRemarks" rows="2" placeholder="Operational notes..."></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-accent w-100 py-3 fs-5" id="saveBtn">
+                <i class="fas fa-save me-2"></i>Save Production Data
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('prodDate').valueAsDate = new Date();
+        document.getElementById('oilVolume').focus();
+    });
+
+    document.getElementById('prodForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+
+        const payload = {
+            date: document.getElementById('prodDate').value,
+            oil_volume: document.getElementById('oilVolume').value,
+            gas_volume: document.getElementById('gasVolume').value || 0,
+            water_volume: document.getElementById('waterVolume').value || 0,
+            remarks: document.getElementById('prodRemarks').value
+        };
+
+        try {
+            const res = await fetch('/api/production/add', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Saved!',
+                    text: `Recorded ${payload.oil_volume} BBLS net oil production`,
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+                document.getElementById('oilVolume').value = '';
+                document.getElementById('gasVolume').value = '';
+                document.getElementById('waterVolume').value = '';
+                document.getElementById('prodRemarks').value = '';
+                document.getElementById('oilVolume').focus();
+            } else {
+                const data = await res.json();
+                Swal.fire('Error', data.error || 'Failed to save', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Error', 'Connection failed', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-2"></i>Save Production Data';
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WellTest Pro{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.0/dist/apexcharts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.0/dist/sparkline/apex-sparklines.min.js"></script>
+    <style>
+        :root {
+            --primary: #dc2626;
+            --primary-dark: #b91c1c;
+            --primary-light: #ef4444;
+            --primary-gradient: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            --secondary: #7c3aed;
+            --dark: #1e293b;
+            --darker: #0f172a;
+            --light: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #334155;
+            --text-light: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #0ea5e9;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 25px 50px rgba(0, 0, 0, 0.25);
+        }
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: var(--text);
+            min-height: 100vh;
+            scroll-behavior: smooth;
+        }
+        
+        body.dark-mode {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+            --surface: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-light: #94a3b8;
+            --glass-bg: rgba(30, 41, 59, 0.9);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+        
+        body.dark-mode .card {
+            background: var(--glass-bg) !important;
+            border: 1px solid var(--glass-border) !important;
+        }
+        
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        /* Modern Cards */
+        .card {
+            background: var(--surface);
+            border: none;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 1.5rem;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Animated KPI Cards */
+        .kpi-card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+        }
+        
+        .kpi-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .kpi-label {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .kpi-change {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .kpi-change.up {
+            color: var(--success);
+        }
+        
+        .kpi-change.down {
+            color: var(--danger);
+        }
+        
+        /* Primary Button */
+        .btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            padding: 0.625rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.4);
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 12px;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary-gradient);
+            border-color: transparent;
+            color: white;
+        }
+        
+        /* Modern Table */
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table thead th {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: none;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-light);
+            padding: 1rem 1.5rem;
+        }
+        
+        body.dark-mode .table thead th {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+        
+        .table tbody tr {
+            transition: all 0.2s ease;
+        }
+        
+        .table tbody tr:hover {
+            background: rgba(220, 38, 38, 0.05);
+        }
+        
+        .table td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        
+        /* Modern Navbar */
+        .navbar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 0.75rem 1.5rem;
+        }
+        
+        .nav-link {
+            border-radius: 10px;
+            padding: 0.5rem 1rem !important;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        
+        .nav-link:hover {
+            background: rgba(220, 38, 38, 0.1);
+        }
+        
+        .nav-link.active {
+            background: var(--primary-gradient);
+            color: white !important;
+        }
+        
+        /* Badges */
+        .badge {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.375rem 0.75rem;
+        }
+        
+        .bg-primary {
+            background: var(--primary-gradient) !important;
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        @keyframes countUp {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        
+        .animate-delay-1 { animation-delay: 0.1s; }
+        .animate-delay-2 { animation-delay: 0.2s; }
+        .animate-delay-3 { animation-delay: 0.3s; }
+        .animate-delay-4 { animation-delay: 0.4s; }
+        .animate-delay-5 { animation-delay: 0.5s; }
+        
+        /* Skeleton Loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        
+        body.dark-mode .skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
+        }
+        
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+        }
+        
+        .toast {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            box-shadow: var(--shadow-lg);
+            animation: fadeInUp 0.3s ease;
+        }
+        
+        .toast.success { border-left: 4px solid var(--success); }
+        .toast.error { border-left: 4px solid var(--danger); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        .toast.info { border-left: 4px solid var(--info); }
+        
+        /* Modern Form Controls */
+        .form-control, .form-select {
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            padding: 0.625rem 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15);
+        }
+        
+        /* Modern Dropdowns */
+        .dropdown-menu {
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            padding: 0.75rem;
+        }
+        
+        .dropdown-item {
+            border-radius: 10px;
+            padding: 0.625rem 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .dropdown-item:hover {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--primary);
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+        
+        /* ApexCharts Custom Styling */
+        .apexcharts-tooltip {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 12px !important;
+            box-shadow: var(--shadow-lg) !important;
+        }
+        
+        .apexcharts-tooltip-title {
+            background: var(--primary) !important;
+            color: white !important;
+            border-radius: 8px 8px 0 0 !important;
+        }
+        
+        .apexcharts-menu {
+            background: var(--surface) !important;
+            border-radius: 12px !important;
+        }
+        
+        .apexcharts-menu-item:hover {
+            background: rgba(220, 38, 38, 0.1) !important;
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Alert Cards */
+        .alert-card {
+            border-radius: 16px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .alert-card.critical {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
+            border-left: 4px solid var(--danger);
+        }
+        
+        .alert-card.warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+            border-left: 4px solid var(--warning);
+        }
+        
+        /* Trend Indicators */
+        .trend-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            font-size: 0.875rem;
+        }
+        
+        .trend-indicator.up {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+        
+        .trend-indicator.down {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        
+        .trend-indicator.stable {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        
+        /* Gradient Text */
+        .gradient-text {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Fade In Animation Class */
+        .fade-in {
+            opacity: 0;
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        
+        /* Responsive Cards Grid */
+        @media (max-width: 768px) {
+            .kpi-value {
+                font-size: 1.75rem;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <div class="gradient-text fw-bold" style="font-size: 1.5rem;">
+                    <i class="fas fa-oil-can me-2"></i>WellTest Pro
+                </div>
+            </a>
+            
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard.index') }}">
+                            <i class="fas fa-chart-line me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard.list_tests') }}">
+                            <i class="fas fa-clipboard-list me-1"></i> Tests
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard.new_test') }}">
+                            <i class="fas fa-plus-circle me-1"></i> New Test
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard.list_wells') }}">
+                            <i class="fas fa-industry me-1"></i> Wells
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard.analytics') }}">
+                            <i class="fas fa-chart-bar me-1"></i> Analytics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data.import_data') }}">
+                            <i class="fas fa-upload me-1"></i> Import
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="dropdown">
+                        <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-2"></i><span id="userDisplay">Loading...</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li id="settingsLink" style="display:none;"><a class="dropdown-item" href="{{ url_for('settings.settings') }}"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><a class="dropdown-item text-warning" href="/gateway"><i class="fas fa-exchange-alt me-2"></i>Switch App</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="toast-container">
+                    {% for category, message in messages %}
+                        <div class="toast {{ category }}">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-{{ 'check-circle success' if category == 'success' else 'exclamation-circle error' }} me-3"></i>
+                                <div>
+                                    <strong>{{ 'Success' if category == 'success' else 'Error' }}</strong>
+                                    <p class="mb-0">{{ message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <div class="modal fade" id="alertModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="alertTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="alertMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Enforce authentication on all pages using base.html
+        if (!localStorage.getItem('token')) {
+            window.location.href = '/login';
+        }
+        const userRole = localStorage.getItem('role');
+        const allowedFeatures = JSON.parse(localStorage.getItem('allowedFeatures') || '[]');
+        if (userRole !== 'admin' && !allowedFeatures.includes('app_welltest')) {
+            window.location.href = '/gateway';
+        }
+
+        let alertModal;
+
+        function initUserMenu() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username') || '';
+            
+            if (username) {
+                document.getElementById('userDisplay').textContent = username;
+            }
+            
+            const role = localStorage.getItem('role') || '';
+            if (role === 'admin') {
+                document.getElementById('settingsLink').style.display = '';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            localStorage.removeItem('role');
+            localStorage.removeItem('allowedFeatures');
+            window.location.href = '/login';
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const container = document.querySelector('.toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = `toast show ${type}`;
+            toast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} me-3" style="color: var(--${type})"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+        
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+            return container;
+        }
+
+        // Animated counter function
+        function animateCounter(element, target, duration = 2000, decimals = 0) {
+            const start = 0;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const current = start + (target - start) * easeOut;
+                
+                element.textContent = decimals > 0 ? current.toFixed(decimals) : Math.round(current);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+
+        function showAlert(title, message) {
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = message;
+            if (!alertModal) {
+                alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
+            }
+            alertModal.show();
+        }
+
+        function getHeaders() {
+            const token = localStorage.getItem('token');
+            if (!token && window.location.pathname !== '/login') {
+                window.location.href = '/login';
+                return {};
+            }
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        async function handleResponse(res) {
+            if (res.status === 401 && window.location.pathname !== '/login') {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+                return null;
+            }
+            return res;
+        }
+
+        initUserMenu();
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Import Data - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-upload me-2"></i>Import Test Data from CSV
+                </div>
+                <div class="card-body">
+                    <form id="importForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Select CSV File</label>
+                            <input type="file" class="form-control" id="csvFile" accept=".csv" required>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h6>CSV Format:</h6>
+                            <code>well,date,time,bean_size,inlet_pressure,separator_pressure,temperature,liquid_rate,rate_diff,gross_rate,bsw,remarks</code>
+                            <hr>
+                            <small>Example:<br>
+                            Well-A1,2024-01-15,10:00:00,20,500,200,150,100,10,90,30,Initial test</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Import
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('importForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const file = document.getElementById('csvFile').files[0];
+    if (!file) { alert('Please select a file'); return; }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/import', { method: 'POST', body: formData });
+        const data = await response.json();
+        if (response.ok) {
+            alert(data.message);
+            window.location.href = '/';
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+</script>
+{% endblock %}

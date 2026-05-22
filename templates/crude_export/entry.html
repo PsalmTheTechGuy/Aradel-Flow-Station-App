@@ -1,0 +1,169 @@
+{% extends 'crude_export/base.html' %}
+
+{% block title %}Data Entry - Crude Export Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .entry-form {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .form-control, .form-select {
+        border-radius: 12px;
+        padding: 0.8rem 1rem;
+        border: 2px solid #e2e8f0;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px rgba(178, 0, 15, 0.1);
+    }
+    .dest-btn {
+        flex: 1;
+        padding: 1rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 15px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: white;
+    }
+    .dest-btn.active {
+        border-color: var(--accent);
+        background: rgba(178, 0, 15, 0.05);
+        color: var(--accent);
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="mb-5 text-center">
+        <h2 class="fw-bold">Daily Export Entry</h2>
+        <p class="text-muted">Record destination volumes for field production reporting</p>
+    </div>
+
+    <div class="glass-card entry-form">
+        <form id="entryForm">
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Export Date</label>
+                <input type="date" class="form-control" id="entryDate" required>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Destination</label>
+                <div class="d-flex gap-2" id="destPicker">
+                    <div class="dest-btn active" data-value="TNP">TNP</div>
+                    <div class="dest-btn" data-value="INGENTIA">INGENTIA</div>
+                    <div class="dest-btn" data-value="ACE">ACE</div>
+                    <div class="dest-btn" data-value="INTESSA">INTESSA</div>
+                    <div class="dest-btn" data-value="REFINERY">REFINERY</div>
+                </div>
+                <input type="hidden" id="entryDest" value="TNP">
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Volume (Barrels)</label>
+                <div class="input-group">
+                    <input type="number" step="0.01" class="form-control fs-4 fw-bold" id="entryVolume" placeholder="0.00" required>
+                    <span class="input-group-text">BBLS</span>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-uppercase">Remarks (Optional)</label>
+                <textarea class="form-control" id="entryRemarks" rows="2" placeholder="e.g., Meter factor adjustment..."></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-accent w-100 py-3 fs-5" id="saveBtn">
+                <i class="fas fa-save me-2"></i>Save Record
+            </button>
+        </form>
+
+        <div class="mt-4 pt-4 border-top">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Keyboard Shortcut: Press <b>Enter</b> to save</span>
+                <div class="form-check form-switch">
+                    <input class="form-check-switch" type="checkbox" id="quickAddMode" checked>
+                    <label class="form-check-label small" for="quickAddMode">Quick Add Mode</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Default to today
+        document.getElementById('entryDate').valueAsDate = new Date();
+        
+        // Destination picker
+        const btns = document.querySelectorAll('.dest-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('entryDest').value = btn.dataset.value;
+                document.getElementById('entryVolume').focus();
+            });
+        });
+
+        // Focus volume by default
+        document.getElementById('entryVolume').focus();
+    });
+
+    document.getElementById('entryForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+
+        const payload = {
+            date: document.getElementById('entryDate').value,
+            destination: document.getElementById('entryDest').value,
+            volume: document.getElementById('entryVolume').value,
+            remarks: document.getElementById('entryRemarks').value
+        };
+
+        try {
+            const res = await fetch('/api/crude-export/add', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(payload)
+            });
+            const data = await handleResponse(res);
+
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Saved!',
+                    text: `Recorded ${payload.volume} BBLS for ${payload.destination}`,
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+
+                if (document.getElementById('quickAddMode').checked) {
+                    // Reset volume and remarks, keep date and dest
+                    document.getElementById('entryVolume').value = '';
+                    document.getElementById('entryRemarks').value = '';
+                    document.getElementById('entryVolume').focus();
+                } else {
+                    window.location.href = '/crude-export';
+                }
+            } else {
+                Swal.fire('Error', data.error || 'Failed to save', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Error', 'Connection failed', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-2"></i>Save Record';
+        }
+    });
+</script>
+{% endblock %}

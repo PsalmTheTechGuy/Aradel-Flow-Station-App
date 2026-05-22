@@ -1,0 +1,799 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4 animate-fade-in-up">
+        <div>
+            <h2 class="mb-1 fw-bold gradient-text">
+                <i class="fas fa-chart-line me-2"></i>Production Analytics
+            </h2>
+            <p class="text-muted mb-0">Well performance insights and trends</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="showReportModal()">
+                <i class="fas fa-file-pdf me-2"></i>Management Report
+            </button>
+            <button class="btn btn-primary" onclick="refreshData()">
+                <i class="fas fa-sync-alt me-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="glass-card p-4 mb-4 animate-fade-in-up animate-delay-1">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small text-muted text-uppercase">Period</label>
+                <select class="form-select" id="periodFilter" onchange="applyFilters()">
+                    <option value="all">All Tests</option>
+                    <option value="last5">Last 5 Tests</option>
+                    <option value="last3m">Last 3 Months</option>
+                    <option value="last6m">Last 6 Months</option>
+                    <option value="last12m" selected>Last 12 Months</option>
+                    <option value="last24m">Last 24 Months</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted text-uppercase">Well</label>
+                <select class="form-select" id="wellFilter" onchange="applyFilters()">
+                    <option value="">All Wells</option>
+                    {% for w in wells %}
+                    <option value="{{ w.id }}">{{ w.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted text-uppercase">BS&W Alert Threshold</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="bswThreshold" value="50" onchange="applyFilters()">
+                    <span class="input-group-text">%</span>
+                </div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">
+                    <i class="fas fa-undo me-2"></i>Reset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4" id="kpiCards">
+        <div class="col-md-3 animate-fade-in-up animate-delay-1">
+            <div class="kpi-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="kpi-label mb-2">Total Wells</p>
+                        <h2 class="kpi-value mb-0" id="kpiWells">0</h2>
+                    </div>
+                    <div class="sparkline-container" id="sparkWells"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 animate-fade-in-up animate-delay-2">
+            <div class="kpi-card">
+                <p class="kpi-label mb-2">Active Wells</p>
+                <h2 class="kpi-value" id="kpiActive">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3 animate-fade-in-up animate-delay-3">
+            <div class="kpi-card">
+                <p class="kpi-label mb-2">Need Testing</p>
+                <h2 class="kpi-value" id="kpiNeedTest">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3 animate-fade-in-up animate-delay-4">
+            <div class="kpi-card">
+                <p class="kpi-label mb-2">Total Tests</p>
+                <h2 class="kpi-value" id="kpiTests">0</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8 animate-fade-in-up animate-delay-2">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-chart-area me-2"></i>Production Trend</span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active" onclick="setChartPeriod('all', this)">All</button>
+                        <button class="btn btn-outline-secondary" onclick="setChartPeriod('6m', this)">6M</button>
+                        <button class="btn btn-outline-secondary" onclick="setChartPeriod('12m', this)">12M</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Why this matters:</b> Shows how the total liquid volume (Oil + Water) changes over time. A steady line indicates stable production.
+                    </p>
+                    <div id="productionChart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 animate-fade-in-up animate-delay-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-bell me-2"></i>Alerts
+                    <span class="badge bg-danger ms-2" id="alertCount">0</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    <div class="list-group list-group-flush" id="alertsList">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6 animate-fade-in-up animate-delay-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-tint me-2"></i>Water Cut Trend (BS&W)
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>What is it:</b> Water Cut (BS&W) is the percentage of water in the total liquid. Higher values mean the well is producing more water than oil.
+                    </p>
+                    <div id="bswChart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 animate-fade-in-up animate-delay-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-fire me-2"></i>Net Production Trend
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Goal:</b> This is the "Net Oil" rate. It shows how much actual oil you are producing per day after removing the water.
+                    </p>
+                    <div id="netProdChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6 animate-fade-in-up animate-delay-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-tachometer-alt me-2"></i>BS&W Gauge
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Snapshot:</b> A quick visual of the current water cut. Red zones indicate high water production that may need investigation.
+                    </p>
+                    <div id="bswGauge"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 animate-fade-in-up animate-delay-5">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-balance-scale me-2"></i>Well Performance Radar
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Scorecard:</b> Balances Gross, Net, and BS&W. A larger, balanced shape indicates a high-performing well.
+                    </p>
+                    <div id="radarChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card mb-4 animate-fade-in-up">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-table me-2"></i>Well Performance Summary</span>
+            <input class="form-control form-control-sm w-auto" type="text" id="searchWells" placeholder="Search wells..." oninput="filterWellsTable()">
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="wellsTable">
+                    <thead>
+                        <tr>
+                            <th>Well</th>
+                            <th>Location</th>
+                            <th>Last Test</th>
+                            <th>Tests</th>
+                            <th>Avg Gross Rate</th>
+                            <th>Trend</th>
+                            <th>Avg BS&W</th>
+                            <th>BS&W Trend</th>
+                            <th>Net Prod</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wellsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6 animate-fade-in-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar me-2"></i>Well Comparison
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Benchmarking:</b> Directly compares multiple wells. It's the best way to see which wells are over-performing or under-performing.
+                    </p>
+                    <div id="comparisonChart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 animate-fade-in-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-arrow-down me-2"></i>Decline Curve
+                    <select class="form-select form-select-sm w-auto ms-3" id="declineWellSelect" onchange="loadDeclineAnalysis()">
+                        {% for w in wells %}
+                        <option value="{{ w.id }}">{{ w.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Prediction:</b> Uses historical data to predict how production will drop over the next 12 months. This helps in planning well interventions.
+                    </p>
+                    <div id="declineChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 animate-fade-in-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-th me-2"></i>Well Performance Heatmap
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Density:</b> High-density areas show peak production periods. It helps spot seasonal trends or sudden shifts across the whole field.
+                    </p>
+                    <div id="heatmapChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6 animate-fade-in-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-fire me-2"></i>Production vs Water Cut
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Efficiency:</b> Shows if increased production also leads to more water. Ideally, you want high production with low water cut.
+                    </p>
+                    <div id="scatterChart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 animate-fade-in-up">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie me-2"></i>Production Distribution
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Overview:</b> Each slice represents a well's share of the total field production. It helps you see which wells are your top producers.
+                    </p>
+                    <div id="pieChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Management Report Modal -->
+<div class="modal fade" id="reportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-file-pdf me-2 text-primary"></i>Management Production Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-4">Generate a professional PDF summary of well performance for your chosen period.</p>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label small text-muted text-uppercase fw-bold">Start Date</label>
+                        <input type="date" class="form-control" id="reportStartDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted text-uppercase fw-bold">End Date</label>
+                        <input type="date" class="form-control" id="reportEndDate">
+                    </div>
+                </div>
+                <div class="mt-4 p-3 bg-light rounded border">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="reportFormat" id="formatPdf" value="pdf" checked>
+                        <label class="form-check-label" for="formatPdf">
+                            <i class="fas fa-file-pdf text-danger me-2"></i><b>Professional PDF Summary</b>
+                            <p class="text-muted small mb-0">High-quality formatted report for management</p>
+                        </label>
+                    </div>
+                    <hr>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="reportFormat" id="formatCsv" value="csv">
+                        <label class="form-check-label" for="formatCsv">
+                            <i class="fas fa-file-csv text-success me-2"></i><b>Raw Data CSV</b>
+                            <p class="text-muted small mb-0">Export data for analysis in Excel</p>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-4" onclick="generateReport()">
+                    <i class="fas fa-download me-2"></i>Generate Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let productionChart, bswChart, netProdChart, comparisonChart, declineChart, scatterChart, radarChart, bswGauge, heatmapChart, pieChart;
+let wellsData = [];
+let currentChartPeriod = 'all';
+let reportModal;
+
+function showReportModal() {
+    if (!reportModal) reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+    
+    // Default to last 30 days
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    
+    document.getElementById('reportEndDate').value = end.toISOString().split('T')[0];
+    document.getElementById('reportStartDate').value = start.toISOString().split('T')[0];
+    
+    reportModal.show();
+}
+
+function generateReport() {
+    const start = document.getElementById('reportStartDate').value;
+    const end = document.getElementById('reportEndDate').value;
+    const format = document.querySelector('input[name="reportFormat"]:checked')?.value || 'pdf';
+    
+    let url;
+    if (format === 'pdf') {
+        url = `/api/export/summary/pdf?start_date=${start}&end_date=${end}`;
+    } else {
+        url = `/api/export/report?period=custom&start_date=${start}&end_date=${end}`;
+    }
+    
+    window.location.href = url;
+    reportModal.hide();
+}
+
+const trendIcons = {
+    1: '<span class="trend-indicator up"><i class="fas fa-arrow-up"></i></span>',
+    '-1': '<span class="trend-indicator down"><i class="fas fa-arrow-down"></i></span>',
+    0: '<span class="trend-indicator stable"><i class="fas fa-minus"></i></span>'
+};
+
+const apexTheme = {
+    mode: 'light',
+    palette: 'palette1',
+    shadeIntensity: 0.15,
+    gradient: {
+        enabled: true,
+        shadeFrom: 'white',
+        shadeTo: 'white',
+        shadeTo: 'stop-dark',
+        stops: [0, 100]
+    }
+};
+
+const apexOptions = {
+    chart: {
+        toolbar: { show: true, tools: { download: true, selection: true, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true } },
+        zoom: { enabled: true, type: 'xy' },
+        animations: { enabled: true, easing: 'easeinout', speed: 800, dynamicAnimation: { enabled: true, speed: 350 } },
+        fontFamily: 'Inter, sans-serif',
+        background: 'transparent'
+    },
+    colors: ['#dc2626', '#f97316', '#10b981', '#0ea5e9', '#7c3aed', '#f59e0b'],
+    stroke: { curve: 'smooth', width: 3 },
+    dataLabels: { enabled: false },
+    tooltip: {
+        theme: 'light',
+        style: { fontSize: '12px', fontFamily: 'Inter, sans-serif' },
+        y: { formatter: val => val.toFixed(3) }
+    },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    xaxis: { labels: { style: { colors: '#64748b', fontSize: '11px' } } },
+    yaxis: { labels: { style: { colors: '#64748b', fontSize: '11px' } } }
+};
+
+async function loadData() {
+    showToast('Loading analytics data...', 'info');
+    
+    const period = document.getElementById('periodFilter').value;
+    const wellId = document.getElementById('wellFilter').value;
+    const bswThreshold = document.getElementById('bswThreshold').value;
+    
+    await Promise.all([
+        loadSummary(),
+        loadWellsPerformance(period, wellId),
+        loadAlerts(bswThreshold),
+        loadTrends(),
+        loadComparison(wellId)
+    ]);
+    
+    loadDeclineAnalysis();
+    showToast('Data loaded successfully', 'success');
+}
+
+async function loadSummary() {
+    try {
+        const res = await fetch('/api/analytics/summary', { headers: getHeaders() });
+        const handledRes = await handleResponse(res);
+        if (handledRes && handledRes.ok) {
+            const data = await handledRes.json();
+            
+            animateCounter(document.getElementById('kpiWells'), data.total_wells, 1500);
+            animateCounter(document.getElementById('kpiActive'), data.active_wells, 1500);
+            animateCounter(document.getElementById('kpiNeedTest'), data.wells_needing_test, 1500);
+            animateCounter(document.getElementById('kpiTests'), data.total_tests, 1500);
+        }
+    } catch (e) {
+        console.error('Error loading summary:', e);
+    }
+}
+
+async function loadWellsPerformance(period, wellId) {
+    const url = new URL('/api/analytics/wells/performance', window.location.origin);
+    url.searchParams.set('period', period);
+    if (wellId) url.searchParams.set('well_id', wellId);
+    
+    const res = await fetch(url, { headers: getHeaders() });
+    const handledRes = await handleResponse(res);
+    if (!handledRes || !handledRes.ok) return;
+    
+    wellsData = await handledRes.json();
+    
+    document.getElementById('wellsTableBody').innerHTML = wellsData.map(w => `
+        <tr onclick="viewWellHistory(${w.well_id})" style="cursor:pointer;">
+            <td class="fw-bold">${w.well_name}</td>
+            <td>${w.location || '-'}</td>
+            <td>${w.last_test_date || 'Never'}</td>
+            <td>${w.test_count}</td>
+            <td class="fw-bold text-danger">${w.avg_gross_rate.toFixed(3)}</td>
+            <td>${trendIcons[w.gross_trend] || '-'}</td>
+            <td><span class="badge ${w.avg_bsw > 50 ? 'bg-danger' : 'bg-success'}">${w.avg_bsw.toFixed(1)}%</span></td>
+            <td>${trendIcons[w.bsw_trend] || '-'}</td>
+            <td class="fw-bold text-success">${w.net_prod.toFixed(3)}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewWellHistory(${w.well_id})">
+                    <i class="fas fa-history"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    
+    updateCharts();
+}
+
+async function loadAlerts(bswThreshold) {
+    const url = new URL('/api/analytics/alerts', window.location.origin);
+    url.searchParams.set('bsw_threshold', bswThreshold);
+    
+    const res = await fetch(url, { headers: getHeaders() });
+    const handledRes = await handleResponse(res);
+    if (!handledRes || !handledRes.ok) return;
+    
+    const data = await handledRes.json();
+    
+    document.getElementById('alertCount').textContent = data.summary.total;
+    
+    document.getElementById('alertsList').innerHTML = data.alerts.length === 0 
+        ? '<div class="p-4 text-center text-muted"><i class="fas fa-check-circle fa-2x mb-3 text-success"></i><p>No alerts - all systems normal</p></div>'
+        : data.alerts.slice(0, 10).map(a => `
+            <div class="alert-card ${a.severity}">
+                <div class="flex-shrink-0">
+                    <span class="badge bg-${a.severity === 'critical' ? 'danger' : 'warning'}">${a.severity.toUpperCase()}</span>
+                </div>
+                <div class="flex-grow-1">
+                    <p class="mb-0 fw-medium">${a.message}</p>
+                    <small class="text-muted">${a.well_name}</small>
+                </div>
+            </div>
+        `).join('');
+    
+    updateGauge(data.alerts);
+}
+
+async function loadTrends() {
+    const res = await fetch('/api/analytics/trends', { headers: getHeaders() });
+    const handledRes = await handleResponse(res);
+    if (!handledRes || !handledRes.ok) return;
+    
+    const data = await handledRes.json();
+    
+    const labels = data.map(d => d.month).reverse();
+    const grossData = data.map(d => d.avg_gross_rate).reverse();
+    const bswData = data.map(d => d.avg_bsw).reverse();
+    const netData = data.map(d => d.avg_net_prod).reverse();
+    
+    if (productionChart) productionChart.destroy();
+    productionChart = new ApexCharts(document.getElementById('productionChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'area', height: 350, id: 'production' },
+        series: [{ name: 'Avg Gross Rate', data: grossData }],
+        xaxis: { ...apexOptions.xaxis, categories: labels },
+        yaxis: { ...apexOptions.yaxis, labels: { ...apexOptions.yaxis.labels, formatter: val => val.toFixed(0) } },
+        fill: { type: 'gradient', gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.15, gradientToColors: ['#f97316'], stops: [0, 100] } },
+        stroke: { ...apexOptions.stroke, curve: 'smooth' }
+    });
+    productionChart.render();
+    
+    if (bswChart) bswChart.destroy();
+    bswChart = new ApexCharts(document.getElementById('bswChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'line', height: 280 },
+        series: [{ name: 'Avg BS&W', data: bswData }],
+        xaxis: { ...apexOptions.xaxis, categories: labels },
+        yaxis: { ...apexOptions.yaxis, min: 0, max: 100, labels: { ...apexOptions.yaxis.labels, formatter: val => val + '%' } },
+        colors: ['#0ea5e9'],
+        stroke: { ...apexOptions.stroke, curve: 'smooth' }
+    });
+    bswChart.render();
+    
+    if (netProdChart) netProdChart.destroy();
+    netProdChart = new ApexCharts(document.getElementById('netProdChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'area', height: 280 },
+        series: [{ name: 'Net Production', data: netData }],
+        xaxis: { ...apexOptions.xaxis, categories: labels },
+        fill: { type: 'gradient', gradient: { shade: 'dark', type: 'vertical', shadeIntensity: 0.15, gradientToColors: ['#10b981'], stops: [0, 100] } }
+    });
+    netProdChart.render();
+}
+
+async function loadComparison(wellId) {
+    const url = new URL('/api/analytics/comparison', window.location.origin);
+    if (wellId) url.searchParams.set('well_ids', wellId);
+    
+    const res = await fetch(url, { headers: getHeaders() });
+    const handledRes = await handleResponse(res);
+    if (!handledRes || !handledRes.ok) return;
+    
+    const data = await handledRes.json();
+    
+    if (comparisonChart) comparisonChart.destroy();
+    comparisonChart = new ApexCharts(document.getElementById('comparisonChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'bar', height: 350 },
+        series: [
+            { name: 'Current Gross Rate', data: data.map(d => d.latest_gross) },
+            { name: 'Net Production', data: data.map(d => d.net_prod) }
+        ],
+        xaxis: { ...apexOptions.xaxis, categories: data.map(d => d.well_name) },
+        plotOptions: { bar: { borderRadius: 8, columnWidth: '60%', endingShape: 'rounded' } },
+        fill: { type: 'gradient' }
+    });
+    comparisonChart.render();
+    
+    if (scatterChart) scatterChart.destroy();
+    const scatterData = data.filter(d => d.latest_gross > 0).map(d => ({ x: d.latest_gross, y: d.avg_bsw, name: d.well_name }));
+    scatterChart = new ApexCharts(document.getElementById('scatterChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'scatter', height: 280 },
+        series: [{ name: 'Wells', data: scatterData }],
+        xaxis: { title: { text: 'Gross Rate (BBLS/day)' }, min: 0 },
+        yaxis: { title: { text: 'BS&W (%)' }, min: 0, max: 100 },
+        tooltip: { 
+            custom: ({ dataPointIndex, series, seriesIndex, w }) => {
+                const d = scatterData[dataPointIndex];
+                return `<div class="apex-tooltip bg-white p-3 rounded shadow">
+                    <strong>${d.name}</strong><br>
+                    Gross: ${d.x.toFixed(3)} BBLS/day<br>
+                    BS&W: ${d.y.toFixed(1)}%
+                </div>`;
+            }
+        }
+    });
+    scatterChart.render();
+    
+    updateRadar(data);
+    updatePie(data);
+    updateHeatmap();
+}
+
+function updateRadar(data) {
+    if (radarChart) radarChart.destroy();
+    
+    const maxGross = Math.max(...data.map(d => d.latest_gross));
+    radarChart = new ApexCharts(document.getElementById('radarChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'radar', height: 280 },
+        series: [{
+            name: 'Wells',
+            data: data.map(d => ({
+                name: d.well_name,
+                data: [
+                    (d.latest_gross / maxGross * 100).toFixed(1),
+                    (d.avg_bsw).toFixed(1),
+                    (d.net_prod / maxGross * 100).toFixed(1),
+                    100 - (d.avg_bsw)
+                ]
+            }))
+        }],
+        xaxis: { categories: ['Gross Rate', 'Water Cut', 'Net Prod', 'Oil Quality'] },
+        plotOptions: { radar: { size: 140 } },
+        colors: ['#dc2626', '#f97316', '#10b981', '#0ea5e9', '#7c3aed']
+    });
+    radarChart.render();
+}
+
+function updatePie(data) {
+    if (pieChart) pieChart.destroy();
+    
+    pieChart = new ApexCharts(document.getElementById('pieChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'donut', height: 280 },
+        series: data.map(d => d.latest_gross),
+        labels: data.map(d => d.well_name),
+        plotOptions: {
+            pie: {
+                donut: { size: '70%', labels: { show: true, name: { show: true }, value: { show: true, formatter: val => val.toFixed(0) } } },
+                expandOnClick: true
+            }
+        },
+        dataLabels: { enabled: true, formatter: val => val.toFixed(1) + '%' },
+        stroke: { show: false },
+        legend: { position: 'right' }
+    });
+    pieChart.render();
+}
+
+function updateGauge(alerts) {
+    if (bswGauge) bswGauge.destroy();
+    
+    const avgBsw = wellsData.length > 0 ? wellsData.reduce((sum, w) => sum + w.avg_bsw, 0) / wellsData.length : 0;
+    
+    bswGauge = new ApexCharts(document.getElementById('bswGauge'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'radialBar', height: 280 },
+        series: [avgBsw],
+        plotOptions: {
+            radialBar: {
+                startAngle: -135,
+                endAngle: 135,
+                hollow: { size: '70%' },
+                track: { background: '#f1f5f9', strokeWidth: '100%' },
+                dataLabels: {
+                    show: true,
+                    name: { show: true, color: '#64748b', fontSize: '12px' },
+                    value: { show: true, color: '#dc2626', fontSize: '24px', fontWeight: 800, formatter: val => val.toFixed(1) + '%' }
+                }
+            }
+        },
+        fill: { type: 'gradient', gradient: { shade: 'dark', stops: [0, 100], colorStops: [{ offset: 0, color: '#10b981' }, { offset: 100, color: '#dc2626' }] } },
+        states: { 
+            normal: { filter: { type: 'none' } },
+            hover: { filter: { type: 'lighten', value: 0.1 } },
+            active: { filter: { type: 'darken', value: 0.1 } }
+        }
+    });
+    bswGauge.render();
+}
+
+function updateHeatmap() {
+    if (heatmapChart) heatmapChart.destroy();
+    
+    const heatmapData = wellsData.map((w, i) => ({
+        name: w.well_name,
+        data: [w.avg_gross_rate / 10, (100 - w.avg_bsw), w.net_prod / 10]
+    }));
+    
+    heatmapChart = new ApexCharts(document.getElementById('heatmapChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'heatmap', height: 350 },
+        series: [
+            { name: 'Gross Rate', data: wellsData.map(w => w.avg_gross_rate) },
+            { name: 'Oil Quality (100-BSW)', data: wellsData.map(w => 100 - w.avg_bsw) },
+            { name: 'Net Production', data: wellsData.map(w => w.net_prod) }
+        ],
+        xaxis: { categories: wellsData.map(w => w.well_name) },
+        plotOptions: {
+            heatmap: {
+                radius: 4,
+                colorScale: { ranges: [{ from: 0, to: 50, color: '#fee2e2', name: 'Low' }, { from: 50, to: 100, color: '#f97316', name: 'Medium' }, { from: 100, to: 200, color: '#10b981', name: 'High' }] }
+            }
+        },
+        dataLabels: { enabled: true, formatter: val => val.toFixed(0), style: { fontSize: '10px' } }
+    });
+    heatmapChart.render();
+}
+
+function updateCharts() {
+    updateHeatmap();
+    updateRadar(wellsData);
+    updateGauge([]);
+}
+
+async function loadDeclineAnalysis() {
+    const wellId = document.getElementById('declineWellSelect').value;
+    
+    const res = await fetch(`/api/analytics/decline/${wellId}`, { headers: getHeaders() });
+    const handledRes = await handleResponse(res);
+    if (!handledRes || !handledRes.ok) return;
+    
+    const data = await handledRes.json();
+    
+    const actualData = data.data_points || [];
+    const projectedData = data.projected_production || [];
+    
+    const allLabels = [...actualData.map(d => d.date), ...projectedData.map(d => d.date)];
+    const actualValues = [...actualData.map(d => d.rate), ...new Array(projectedData.length).fill(null)];
+    const projectedValues = [...new Array(actualData.length).fill(null), ...projectedData.map(d => d.rate)];
+    
+    if (declineChart) declineChart.destroy();
+    declineChart = new ApexCharts(document.getElementById('declineChart'), {
+        ...apexOptions,
+        chart: { ...apexOptions.chart, type: 'line', height: 280 },
+        series: [
+            { name: 'Actual', data: actualValues },
+            { name: 'Projected', data: projectedValues }
+        ],
+        xaxis: { ...apexOptions.xaxis, categories: allLabels },
+        stroke: { ...apexOptions.stroke, dashArray: [0, 5] },
+        fill: { type: 'gradient', gradient: { shade: 'dark', type: 'horizontal', shadeIntensity: 0.15, opacityFrom: 1, opacityTo: 1, stops: [0, 100] } },
+        colors: ['#dc2626', '#f59e0b']
+    });
+    declineChart.render();
+}
+
+function setChartPeriod(period, btn) {
+    currentChartPeriod = period;
+    document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadTrends();
+}
+
+function filterWellsTable() {
+    const search = document.getElementById('searchWells').value.toLowerCase();
+    document.querySelectorAll('#wellsTableBody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+}
+
+function viewWellHistory(wellId) {
+    window.location.href = `/analytics/well/${wellId}/history`;
+}
+
+function applyFilters() {
+    loadData();
+}
+
+function resetFilters() {
+    document.getElementById('periodFilter').value = 'last12m';
+    document.getElementById('wellFilter').value = '';
+    document.getElementById('bswThreshold').value = '50';
+    loadData();
+}
+
+function refreshData() {
+    loadData();
+}
+
+function exportReport() {
+    const period = document.getElementById('periodFilter').value;
+    window.open(`/api/analytics/export/report?period=${period}`, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

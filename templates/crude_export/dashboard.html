@@ -1,0 +1,299 @@
+{% extends 'crude_export/base.html' %}
+
+{% block title %}Dashboard - Crude Export Tracker{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 fw-bold">Field Export Overview</h2>
+            <p class="text-muted mb-0">Live tracking of crude oil destination volumes</p>
+        </div>
+        <div class="d-flex gap-3">
+            <div class="input-group">
+                <select class="form-select" id="monthFilter" style="width: 130px;">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+                <select class="form-select" id="yearFilter" style="width: 100px;">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                </select>
+                <button class="btn btn-dark" onclick="refreshAll()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <a href="/crude-export/entry" class="btn btn-accent">
+                <i class="fas fa-plus me-2"></i>New Entry
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4" id="kpiRow">
+        <div class="col-md-3">
+            <div class="glass-card kpi-card">
+                <p class="kpi-label">Monthly Total</p>
+                <h2 class="kpi-value text-primary" id="monthlyTotal">0</h2>
+                <span class="small text-muted">Barrels</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card kpi-card">
+                <p class="kpi-label">Daily Average</p>
+                <h2 class="kpi-value" id="avgDaily">0</h2>
+                <span class="small text-muted">Bbl/d</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card kpi-card">
+                <p class="kpi-label">Peak Production</p>
+                <h2 class="kpi-value text-success" id="peakVolume">0</h2>
+                <span class="small text-muted" id="peakInfo">No data</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card kpi-card">
+                <p class="kpi-label">Data Points</p>
+                <h2 class="kpi-value" id="dataCount">0</h2>
+                <span class="small text-muted">This month</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chart -->
+    <div class="glass-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold mb-0">Daily Export Trend</h5>
+            <div class="d-flex gap-2">
+                <div class="badge bg-primary px-3 py-2">TNP</div>
+                <div class="badge bg-success px-3 py-2">INGENTIA</div>
+                <div class="badge bg-info px-3 py-2">ACE</div>
+                <div class="badge bg-danger px-3 py-2">INTESSA</div>
+                <div class="badge bg-refinery px-3 py-2" style="background: #800080;">REFINERY</div>
+            </div>
+        </div>
+        <div id="mainTrendChart" style="height: 450px;"></div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="glass-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold mb-0">Export Log</h5>
+            <div class="d-flex gap-2">
+                <input type="text" id="tableSearch" class="form-control form-control-sm" placeholder="Search entries..." oninput="filterTable()">
+                <button class="btn btn-sm btn-outline-dark" onclick="exportCSV()">
+                    <i class="fas fa-file-csv me-2"></i>Export CSV
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Destination</th>
+                        <th>Volume (BBLS)</th>
+                        <th>Remarks</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="exportTableBody">
+                    <!-- Loaded via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let trendChart = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const now = new Date();
+        document.getElementById('monthFilter').value = now.getMonth() + 1;
+        document.getElementById('yearFilter').value = now.getFullYear();
+        
+        initChart();
+        refreshAll();
+    });
+
+    function initChart() {
+        const options = {
+            series: [],
+            chart: {
+                type: 'line',
+                height: 450,
+                toolbar: { show: true },
+                zoom: { enabled: true },
+                background: 'transparent',
+                fontFamily: 'Outfit, sans-serif'
+            },
+            colors: ['#0d6efd', '#198754', '#0dcaf0', '#dc3545', '#800080'],
+            stroke: { curve: 'smooth', width: 3 },
+            markers: { size: 5, strokeWidth: 0, hover: { size: 7 } },
+            grid: {
+                borderColor: '#e2e8f0',
+                strokeDashArray: 0,
+                xaxis: { lines: { show: true } },
+                yaxis: { lines: { show: true } }
+            },
+            xaxis: {
+                categories: Array.from({length: 31}, (_, i) => i + 1),
+                title: { text: 'Day of Month', style: { fontWeight: 600 } }
+            },
+            yaxis: {
+                title: { text: 'Volume (Barrels)', style: { fontWeight: 600 } },
+                labels: { formatter: (val) => val.toLocaleString() }
+            },
+            tooltip: {
+                y: { formatter: (val) => val.toLocaleString() + ' BBLS' }
+            },
+            legend: { position: 'top', horizontalAlign: 'right' }
+        };
+
+        trendChart = new ApexCharts(document.querySelector("#mainTrendChart"), options);
+        trendChart.render();
+    }
+
+    async function refreshAll() {
+        const month = document.getElementById('monthFilter').value;
+        const year = document.getElementById('yearFilter').value;
+        
+        loadSummary(month, year);
+        loadChart(month, year);
+        loadTable(month, year);
+    }
+
+    async function loadSummary(m, y) {
+        const res = await fetch(`/api/crude-export/summary?month=${m}&year=${y}`, { headers: getHeaders() });
+        const data = await handleResponse(res);
+        
+        document.getElementById('monthlyTotal').textContent = data.total_monthly.toLocaleString();
+        document.getElementById('avgDaily').textContent = Math.round(data.avg_daily).toLocaleString();
+        document.getElementById('dataCount').textContent = data.count;
+        
+        if (data.peak_day) {
+            document.getElementById('peakVolume').textContent = data.peak_day.volume.toLocaleString();
+            document.getElementById('peakInfo').textContent = `${data.peak_day.dest} on ${data.peak_day.date}`;
+        } else {
+            document.getElementById('peakVolume').textContent = '0';
+            document.getElementById('peakInfo').textContent = 'No data';
+        }
+    }
+
+    async function loadChart(m, y) {
+        const res = await fetch(`/api/crude-export/chart?month=${m}&year=${y}`, { headers: getHeaders() });
+        const data = await handleResponse(res);
+        
+        trendChart.updateSeries([
+            { name: 'TNP', data: data.TNP },
+            { name: 'INGENTIA', data: data.INGENTIA },
+            { name: 'ACE', data: data.ACE },
+            { name: 'INTESSA', data: data.INTESSA },
+            { name: 'REFINERY', data: data.REFINERY }
+        ]);
+    }
+
+    async function loadTable(m, y) {
+        const res = await fetch(`/api/crude-export/list?month=${m}&year=${y}&per_page=100`, { headers: getHeaders() });
+        const data = await handleResponse(res);
+        
+        const body = document.getElementById('exportTableBody');
+        body.innerHTML = '';
+        
+        data.items.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="fw-bold">${item.date}</td>
+                <td><span class="badge ${getDestBadge(item.destination)}">${item.destination}</span></td>
+                <td class="fw-bold">${item.volume.toLocaleString()}</td>
+                <td class="text-muted small">${item.remarks || '-'}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-icon btn-outline-danger" onclick="deleteEntry(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            body.appendChild(row);
+        });
+    }
+
+    function getDestBadge(dest) {
+        switch(dest) {
+            case 'TNP': return 'bg-primary';
+            case 'INGENTIA': return 'bg-success';
+            case 'ACE': return 'bg-info';
+            case 'INTESSA': return 'bg-danger';
+            case 'REFINERY': return 'bg-refinery';
+            default: return 'bg-secondary';
+        }
+    }
+
+    async function deleteEntry(id) {
+        const result = await Swal.fire({
+            title: 'Delete this record?',
+            text: 'This action cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
+        const res = await fetch(`/api/crude-export/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        if (res.ok) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000
+            });
+            refreshAll();
+        } else {
+            Swal.fire('Error', 'Failed to delete record.', 'error');
+        }
+    }
+
+    function exportCSV() {
+        const month = document.getElementById('monthFilter').value;
+        const year = document.getElementById('yearFilter').value;
+        // Simple logic: grab table rows and convert to CSV
+        const rows = Array.from(document.querySelectorAll('#exportTableBody tr'));
+        let csvContent = "data:text/csv;charset=utf-8,Date,Destination,Volume,Remarks\n";
+        
+        rows.forEach(row => {
+            const cols = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+            csvContent += cols.slice(0, 4).join(",") + "\n";
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `crude_export_${year}_${month}.csv`);
+        document.body.appendChild(link);
+        link.click();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,407 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">User Management</h4>
+                    <div>
+                        <a href="/settings/backup" class="btn btn-outline-danger me-2">
+                            <i class="fas fa-database me-1"></i>Database Backups
+                        </a>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                            <i class="fas fa-plus me-1"></i>Add User
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for u in users %}
+                                <tr data-id="{{ u.id }}">
+                                    <td>{{ u.id }}</td>
+                                    <td>{{ u.username }}</td>
+                                    <td><span class="badge bg-{{ 'primary' if u.role == 'admin' else 'secondary' }}">{{ u.role }}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser({{ u.id }})">
+                                            <i class="fas fa-edit"></i> Manage
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ u.id }})" {{ 'disabled' if u.username == 'admin' or u.id == current_user.id else '' }}>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card" style="border: 1px solid #ef4444;">
+            <div class="card-header" style="background-color: rgba(239, 68, 68, 0.1); border-bottom: 1px solid #ef4444;">
+                <h5 class="mb-0 text-danger fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>System Data Control (Danger Zone)</h5>
+            </div>
+            <div class="card-body">
+                <h6 class="fw-bold">Crude Export Factory Reset</h6>
+                <p class="text-muted mb-3">This will permanently delete <strong>ALL</strong> crude export records from the database. This action cannot be undone. Please ensure you have downloaded a backup first.</p>
+                <button id="btnResetCrudeExport" class="btn btn-danger mb-4" onclick="resetCrudeExport()">
+                    <i class="fas fa-trash-alt me-2"></i>Factory Reset Crude Export
+                </button>
+
+                <h6 class="fw-bold border-top pt-3">WellTest Pro Factory Reset</h6>
+                <p class="text-muted mb-3">This will permanently delete <strong>ALL</strong> wells, tests, and readings from the database. This action cannot be undone. Please ensure you have downloaded a backup first.</p>
+                <button id="btnResetWellTest" class="btn btn-danger" onclick="resetWellTest()">
+                    <i class="fas fa-fire me-2"></i>Factory Reset WellTest Pro
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" name="role">
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <hr>
+                    <h6>Feature Access</h6>
+                    <p class="text-muted small">Uncheck features to restrict access</p>
+                    {% for f in features %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="perm_{{ f[0] }}" id="add_perm_{{ f[0] }}" checked>
+                        <label class="form-check-label" for="add_perm_{{ f[0] }}">{{ f[1] }}</label>
+                    </div>
+                    {% endfor %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User - <span id="editUserName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" name="role">
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password (leave blank to keep current)</label>
+                        <input type="password" class="form-control" name="password">
+                    </div>
+                    <hr>
+                    <h6>Feature Access</h6>
+                    <p class="text-muted small">Uncheck features to restrict access for this user</p>
+                    {% for f in features %}
+                    <div class="form-check" id="edit_perm_{{ f[0] }}_wrapper">
+                        <input class="form-check-input" type="checkbox" name="perm_{{ f[0] }}" id="edit_perm_{{ f[0] }}">
+                        <label class="form-check-label" for="edit_perm_{{ f[0] }}">{{ f[1] }}</label>
+                    </div>
+                    {% endfor %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateUser()">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const features = {{ features|tojson }};
+const userPermissions = {{ user_permissions|tojson }};
+
+function getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    return token ? {'Authorization': `Bearer ${token}`} : {};
+}
+
+async function saveUser() {
+    const form = document.getElementById('addUserForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    for (const f of features) {
+        data[`perm_${f[0]}`] = form.querySelector(`[name="perm_${f[0]}"]`).checked;
+    }
+    
+    const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+        body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    
+    if (res.ok) {
+        showToast('User created successfully!', 'success');
+        setTimeout(() => location.reload(), 1200);
+    } else {
+        showToast(result.error || 'Failed to create user', 'error');
+    }
+}
+
+async function editUser(id) {
+    const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    const form = document.getElementById('editUserForm');
+    form.id.value = id;
+    document.getElementById('editUserName').textContent = `User #${id}`;
+    
+    const perms = userPermissions[id] || {};
+    for (const f of features) {
+        const cb = form.querySelector(`[name="perm_${f[0]}"]`);
+        cb.checked = perms[f[0]] !== undefined ? perms[f[0]] : true;
+    }
+    
+    modal.show();
+}
+
+async function updateUser() {
+    const form = document.getElementById('editUserForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    for (const f of features) {
+        data[`perm_${f[0]}`] = form.querySelector(`[name="perm_${f[0]}"]`).checked;
+    }
+    
+    const res = await fetch(`/api/users/${data.id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+        body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    
+    if (res.ok) {
+        showToast('User updated successfully!', 'success');
+        setTimeout(() => location.reload(), 1200);
+    } else {
+        showToast(result.error || 'Failed to update user', 'error');
+    }
+}
+
+let _deleteUserId = null;
+
+function deleteUser(id) {
+    _deleteUserId = id;
+    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    modal.show();
+}
+
+async function executeDeleteUser() {
+    const modalEl = document.getElementById('confirmDeleteModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
+    const res = await fetch(`/api/users/${_deleteUserId}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const result = await res.json();
+
+    if (res.ok) {
+        showToast('User deleted successfully.', 'success');
+        setTimeout(() => location.reload(), 1200);
+    } else {
+        showToast(result.error || 'Failed to delete user', 'error');
+    }
+}
+
+function resetCrudeExport() {
+    const modal = new bootstrap.Modal(document.getElementById('confirmResetModal'));
+    modal.show();
+}
+
+async function executeResetCrudeExport() {
+    const modalEl = document.getElementById('confirmResetModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
+    const btn = document.getElementById('btnResetCrudeExport');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Wiping data...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`/api/settings/reset-crude-export`, { method: 'POST', headers: getAuthHeaders() });
+        const result = await res.json();
+        
+        if (res.ok) {
+            showToast('Success! All crude export records have been deleted.', 'success');
+        } else {
+            showToast(result.error || 'Failed to reset crude export records.', 'error');
+        }
+    } catch (e) {
+        showToast('Network error occurred.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+function resetWellTest() {
+    const modal = new bootstrap.Modal(document.getElementById('confirmResetWellTestModal'));
+    modal.show();
+}
+
+async function executeResetWellTest() {
+    const modalEl = document.getElementById('confirmResetWellTestModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
+    const btn = document.getElementById('btnResetWellTest');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Wiping data...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`/api/settings/reset-welltest`, { method: 'POST', headers: getAuthHeaders() });
+        const result = await res.json();
+        
+        if (res.ok) {
+            showToast('Success! All WellTest Pro records have been deleted.', 'success');
+        } else {
+            showToast(result.error || 'Failed to reset WellTest Pro records.', 'error');
+        }
+    } catch (e) {
+        showToast('Network error occurred.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+</script>
+
+<!-- Delete User Confirmation Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <div class="w-100 text-center pt-3">
+                    <div style="width:60px;height:60px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                        <i class="fas fa-user-times text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold">Delete User?</h5>
+                </div>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center text-muted px-4">
+                <p>This user will be permanently removed. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" onclick="executeDeleteUser()">
+                    <i class="fas fa-trash me-2"></i>Yes, Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Factory Reset Confirmation Modal -->
+<div class="modal fade" id="confirmResetModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header border-0 pb-0">
+                <div class="w-100 text-center pt-3">
+                    <div style="width:60px;height:60px;border-radius:50%;background:rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                        <i class="fas fa-exclamation-triangle text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-danger">Factory Reset Crude Export?</h5>
+                </div>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center px-4">
+                <p class="text-muted">This will permanently delete <strong>ALL</strong> crude export records from the database.</p>
+                <div class="alert alert-danger py-2 px-3 text-start" style="border-radius:10px;font-size:0.875rem;">
+                    <i class="fas fa-lock me-2"></i>This action <strong>cannot be reversed</strong>. Ensure you have a backup before proceeding.
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" onclick="executeResetCrudeExport()">
+                    <i class="fas fa-trash-alt me-2"></i>Yes, Wipe All Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WellTest Pro Factory Reset Confirmation Modal -->
+<div class="modal fade" id="confirmResetWellTestModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header border-0 pb-0">
+                <div class="w-100 text-center pt-3">
+                    <div style="width:60px;height:60px;border-radius:50%;background:rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                        <i class="fas fa-exclamation-triangle text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-danger">Factory Reset WellTest Pro?</h5>
+                </div>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center px-4">
+                <p class="text-muted">This will permanently delete <strong>ALL</strong> wells, tests, and readings from the database.</p>
+                <div class="alert alert-danger py-2 px-3 text-start" style="border-radius:10px;font-size:0.875rem;">
+                    <i class="fas fa-lock me-2"></i>This action <strong>cannot be reversed</strong>. Ensure you have a backup before proceeding.
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center gap-2 pb-4">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" onclick="executeResetWellTest()">
+                    <i class="fas fa-trash-alt me-2"></i>Yes, Wipe All Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

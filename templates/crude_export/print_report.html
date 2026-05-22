@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A3 Export Report - ExportTracker Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background: #fff; color: #000; }
+        
+        @page {
+            size: A3 landscape;
+            margin: 10mm;
+        }
+
+        .report-header {
+            border-bottom: 4px solid #b2000f;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .grid-container {
+            position: relative;
+            width: 100%;
+            height: 650px; /* adjusted for space */
+            background-color: #fff;
+            /* Improved Engineering graph paper grid */
+            background-image: 
+                linear-gradient(rgba(0,100,200,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,100,200,0.1) 1px, transparent 1px),
+                linear-gradient(rgba(0,100,200,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,100,200,0.03) 1px, transparent 1px);
+            background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .chart-loader {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .no-print {
+            padding: 15px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+            .grid-container { border: 1px solid #000; box-shadow: none; }
+            .badge { border: 1px solid #000; color: #000; }
+        }
+
+        .kpi-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .kpi-card {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-top: 4px solid #b2000f;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            background-color: #fcfcfc;
+        }
+
+        .kpi-card h6 {
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #555;
+        }
+
+        .kpi-card h3 {
+            margin-bottom: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #000;
+        }
+
+        .table-data {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+            font-size: 8pt;
+        }
+        .table-data th, .table-data td {
+            border: 1px solid #000;
+            padding: 4px;
+            text-align: center;
+        }
+        .table-data th {
+            background-color: #f8f9fa;
+            color: #b2000f;
+            font-weight: 800;
+        }
+        
+        .dest-legend {
+            display: flex;
+            gap: 15px;
+            font-weight: 600;
+            font-size: 10pt;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; }
+        .legend-color { width: 12px; height: 12px; margin-right: 5px; border: 1px solid #000; }
+    </style>
+</head>
+<body class="p-4">
+    <div class="no-print">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0 fw-bold">A3 Printable Export Report <span class="badge bg-primary ms-2">Advanced</span></h5>
+                    <p class="text-muted small mb-0">Select month/year and click Print. Replicates manual field plotting sheets.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="monthFilter" style="width: 130px;">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="yearFilter" style="width: 100px;">
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="destFilter" style="width: 150px;">
+                        <option value="ALL">All Destinations</option>
+                        <option value="TNP">TNP Only</option>
+                        <option value="INGENTIA">INGENTIA Only</option>
+                        <option value="ACE">ACE Only</option>
+                        <option value="INTESSA">INTESSA Only</option>
+                        <option value="REFINERY">DAILY REFINERY FEED Only</option>
+                    </select>
+                    <button class="btn btn-dark btn-sm" onclick="loadData()">
+                        <i class="fas fa-sync-alt me-2"></i>Update Chart
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="window.print()">
+                        <i class="fas fa-print me-2"></i>Print A3 Report
+                    </button>
+                    <a href="/crude-export" class="btn btn-outline-dark btn-sm">
+                        <i class="fas fa-arrow-left me-2"></i>Back
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-content" id="printableArea">
+        <div class="d-flex justify-content-between align-items-end report-header">
+            <div class="d-flex align-items-center gap-4">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Aradel Holdings" style="height: 70px;">
+                <div>
+                    <h1 class="fw-bold mb-1" style="font-size: 24pt; color: #b2000f; letter-spacing: -0.5px;">CRUDE OIL EXPORT VOLUME REPORT <span class="badge ms-2" style="font-size: 10pt; vertical-align: middle; background-color: #333;">ADVANCED ANALYTICS</span></h1>
+                    <p class="mb-0 fw-bold text-muted" style="font-size: 13pt;" id="reportPeriod">MONTH: OCTOBER | YEAR: 2026</p>
+                </div>
+            </div>
+            <div class="text-end">
+                <p class="mb-0 fw-bold" style="color: #b2000f; font-size: 11pt;">FIELD OPERATIONS DEPARTMENT</p>
+                <p class="mb-0 small">FORM CODE: EXP-PLT-A3-V2</p>
+            </div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <h6>Total Monthly Export</h6>
+                <h3 id="kpiTotal">0 <small class="fs-6 text-muted">BBLS</small></h3>
+            </div>
+            <div class="kpi-card">
+                <h6>Daily Average</h6>
+                <h3 id="kpiAvg">0 <small class="fs-6 text-muted">BBLS</small></h3>
+            </div>
+            <div class="kpi-card">
+                <h6>Monthly Trend</h6>
+                <h3 id="kpiTrend" class="text-primary">-</h3>
+                <span class="badge bg-light text-dark mt-1 border">H2 vs H1</span>
+            </div>
+            <div class="kpi-card">
+                <h6>Peak Production Day</h6>
+                <h3 id="kpiMax">0 <small class="fs-6 text-muted">BBLS</small></h3>
+                <span id="kpiMaxDay" class="badge bg-dark mt-1">Day --</span>
+            </div>
+            <div class="kpi-card">
+                <h6>Lowest Production Day</h6>
+                <h3 id="kpiMin">0 <small class="fs-6 text-muted">BBLS</small></h3>
+                <span id="kpiMinDay" class="badge bg-dark mt-1">Day --</span>
+            </div>
+        </div>
+
+        <div class="grid-container">
+            <div id="chartLoader" class="chart-loader d-none">
+                <div class="spinner-border" style="color: #b2000f; width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h6 class="mt-3 fw-bold text-dark" style="letter-spacing: 2px;">PROCESSING DATA...</h6>
+            </div>
+            <div id="printChart" style="width: 100%; height: 100%;"></div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="dest-legend" id="printLegend">
+                <div class="legend-item d-tnp"><div class="legend-color" style="background: #0000FF;"></div> TNP</div>
+                <div class="legend-item d-ing"><div class="legend-color" style="background: #008000;"></div> INGENTIA</div>
+                <div class="legend-item d-ace"><div class="legend-color" style="background: #00CED1;"></div> ACE</div>
+                <div class="legend-item d-int"><div class="legend-color" style="background: #FF0000;"></div> INTESSA</div>
+                <div class="legend-item d-ref"><div class="legend-color" style="background: #800080;"></div> REFINERY FEED</div>
+                <div class="legend-item"><div class="legend-color" style="background: #FF8C00;"></div> 7-Day MA</div>
+                <div class="legend-item"><div class="legend-color" style="background: #000000; height: 3px; border:none;"></div> Cumulative Actual</div>
+                <div class="legend-item"><div class="legend-color" style="background: transparent; height: 0px; border-top: 3px dashed #6c757d;"></div> Ideal Target Path</div>
+            </div>
+            <div class="text-end">
+                <p class="small text-muted mb-0"><strong>ExportTracker Pro</strong> Developed by PsalmTheTechGuy | Date: <span id="printDate"></span></p>
+            </div>
+        </div>
+
+        <table class="table-data mt-3 mb-2" id="dailyTable">
+            <!-- Populated via JS -->
+        </table>
+
+        <div class="mt-3 text-start text-muted p-3 rounded no-print-bg" style="font-size: 0.8rem; background-color: #f8fafc; border: 1px solid #e2e8f0;">
+            <strong class="text-dark"><i class="fas fa-info-circle me-1"></i> How to read this chart:</strong>
+            <div class="row mt-2">
+                <div class="col-md-6">
+                    <ul class="mb-1 ps-3">
+                        <li class="mb-1"><strong>Colored Bars:</strong> The exact volume of oil sent to each destination on a specific day.</li>
+                        <li class="mb-1"><strong>Orange Line (7-Day Avg):</strong> Smooths out daily spikes to show if overall production is rising or falling.</li>
+                        <li class="mb-1"><strong>Solid Black Line (Cumulative):</strong> Tracks the total oil produced so far this month (read the numbers on the right-side axis).</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="mb-1 ps-3">
+                        <li class="mb-1"><strong>Dashed Gray Line (Ideal Path):</strong> The path you would take if every day hit the average. If the black line is above this, you are ahead of target!</li>
+                        <li class="mb-1"><strong>Shaded Background Columns:</strong> These highlight weekends (Saturdays & Sundays) to help spot downtime patterns.</li>
+                        <li class="mb-1"><strong>Table Colors:</strong> In the table below, Green cells are your best producing days, and Red cells are the lowest.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let printChart = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            document.getElementById('monthFilter').value = now.getMonth() + 1;
+            document.getElementById('yearFilter').value = now.getFullYear();
+            document.getElementById('printDate').textContent = now.toLocaleDateString();
+            
+            initPrintChart();
+            loadData();
+        });
+
+        function initPrintChart() {
+            const options = {
+                series: [],
+                chart: {
+                    type: 'line',
+                    stacked: true,
+                    height: '100%',
+                    toolbar: { show: false },
+                    animations: { enabled: false },
+                    fontFamily: 'Outfit, sans-serif'
+                },
+                colors: ['#0000FF', '#008000', '#00CED1', '#FF0000', '#800080', '#FF8C00', '#000000', '#6c757d'],
+                stroke: { 
+                    width: [0, 0, 0, 0, 0, 3, 3, 3],
+                    curve: 'smooth',
+                    dashArray: [0, 0, 0, 0, 0, 0, 0, 5]
+                },
+                plotOptions: {
+                    bar: {
+                        columnWidth: '60%',
+                        borderRadius: 3,
+                        borderRadiusApplication: 'end'
+                    }
+                },
+                dataLabels: {
+                    enabled: true,
+                    enabledOnSeries: [0, 1, 2, 3, 4],
+                    formatter: function (val) {
+                        return val > 0 ? val.toLocaleString() : "";
+                    },
+                    style: {
+                        fontSize: '10px',
+                        fontFamily: 'Outfit, sans-serif',
+                        fontWeight: 800,
+                        colors: ['#000']
+                    },
+                    background: {
+                        enabled: false
+                    },
+                    dropShadow: {
+                        enabled: true,
+                        top: 0,
+                        left: 0,
+                        blur: 2,
+                        color: '#fff',
+                        opacity: 1
+                    }
+                },
+                fill: {
+                    type: ['gradient', 'gradient', 'gradient', 'gradient', 'gradient', 'solid', 'solid', 'solid'],
+                    gradient: {
+                        shade: 'light',
+                        type: 'vertical',
+                        shadeIntensity: 0.2,
+                        inverseColors: false,
+                        opacityFrom: 1,
+                        opacityTo: 0.8,
+                        stops: [0, 100]
+                    }
+                },
+                markers: { size: 0 },
+                grid: {
+                    show: true,
+                    borderColor: '#e2e8f0',
+                    strokeDashArray: 4,
+                    padding: { left: 20, right: 20, top: 20, bottom: 0 },
+                    xaxis: { lines: { show: false } },
+                    yaxis: { lines: { show: true } }
+                },
+                xaxis: {
+                    categories: Array.from({length: 31}, (_, i) => i + 1),
+                    title: { text: "DAY OF THE MONTH", style: { fontWeight: 700, color: '#000' } },
+                    labels: { style: { colors: '#000', fontWeight: 600 } },
+                    axisBorder: { show: true, color: '#000' },
+                    axisTicks: { show: true, color: '#000' }
+                },
+                yaxis: [
+                    {
+                        min: 0,
+                        max: 20000,
+                        tickAmount: 10,
+                        title: { text: "Daily Volume (BBLS)", style: { fontWeight: 700, color: '#000' } },
+                        labels: { formatter: (val) => val.toLocaleString(), style: { colors: '#000', fontWeight: 600 } },
+                        axisBorder: { show: true, color: '#000' },
+                        axisTicks: { show: true, color: '#000' }
+                    },
+                    { show: false },
+                    { show: false },
+                    { show: false },
+                    { show: false },
+                    { show: false },
+                    {
+                        opposite: true,
+                        title: { text: "Cumulative Volume (BBLS)", style: { fontWeight: 700, color: '#000' } },
+                        labels: { formatter: (val) => val.toLocaleString(), style: { colors: '#000', fontWeight: 600 } },
+                        axisBorder: { show: true, color: '#000' },
+                        axisTicks: { show: true, color: '#000' }
+                    },
+                    {
+                        show: false,
+                        opposite: true,
+                        min: 0,
+                        max: (max) => max // Tie to the same scale
+                    }
+                ],
+                tooltip: {
+                    shared: true,
+                    intersect: false,
+                    y: { 
+                        formatter: function(y, { seriesIndex, dataPointIndex, w }) {
+                            if (typeof y === "undefined") return y;
+                            if (seriesIndex <= 4) {
+                                let total = 0;
+                                for (let i=0; i<=4; i++) {
+                                    total += w.globals.series[i][dataPointIndex] || 0;
+                                }
+                                let pct = total > 0 ? ((y / total) * 100).toFixed(1) + "%" : "0%";
+                                return y.toLocaleString() + " BBLS (" + pct + ")";
+                            }
+                            return y.toLocaleString() + " BBLS";
+                        }
+                    }
+                },
+                legend: { show: false },
+                annotations: {
+                    yaxis: [],
+                    xaxis: []
+                }
+            };
+
+            printChart = new ApexCharts(document.querySelector("#printChart"), options);
+            printChart.render();
+        }
+
+        async function loadData() {
+            // Show Loader
+            const loader = document.getElementById('chartLoader');
+            if (loader) loader.classList.remove('d-none');
+
+            const month = document.getElementById('monthFilter').value;
+            const year = document.getElementById('yearFilter').value;
+            const destSelection = document.getElementById('destFilter').value;
+            const monthName = document.getElementById('monthFilter').options[month-1].text.toUpperCase();
+            
+            document.getElementById('reportPeriod').textContent = `MONTH: ${monthName} | YEAR: ${year} ${destSelection !== 'ALL' ? '| DESTINATION: ' + destSelection : ''}`;
+            
+            const token = localStorage.getItem('token');
+            const headers = { 'Authorization': 'Bearer ' + token };
+
+            // Load Chart Data
+            const cRes = await fetch(`/api/crude-export/chart?month=${month}&year=${year}`, { headers });
+            const cData = await cRes.json();
+            
+            const tnps = destSelection === 'ALL' || destSelection === 'TNP' ? cData.TNP : Array(31).fill(0);
+            const ings = destSelection === 'ALL' || destSelection === 'INGENTIA' ? cData.INGENTIA : Array(31).fill(0);
+            const aces = destSelection === 'ALL' || destSelection === 'ACE' ? cData.ACE : Array(31).fill(0);
+            const ints = destSelection === 'ALL' || destSelection === 'INTESSA' ? cData.INTESSA : Array(31).fill(0);
+            const refs = destSelection === 'ALL' || destSelection === 'REFINERY' ? cData.REFINERY : Array(31).fill(0);
+
+            const dailyTotals = [];
+            const cumulativeTotals = [];
+            const movingAverages = [];
+            let runSum = 0;
+            let maxVol = 0;
+            let minVol = Number.MAX_VALUE;
+            let maxDay = 0;
+            let minDay = 0;
+
+            for (let i = 0; i < tnps.length; i++) {
+                const total = tnps[i] + ings[i] + aces[i] + ints[i] + refs[i];
+                dailyTotals.push(total);
+                runSum += total;
+                cumulativeTotals.push(runSum);
+                
+                if (total > 0 && total > maxVol) { maxVol = total; maxDay = i + 1; }
+                if (total > 0 && total < minVol) { minVol = total; minDay = i + 1; }
+                
+                // 7-day MA
+                if (i >= 6) {
+                    let sum7 = 0;
+                    for (let j = 0; j < 7; j++) { sum7 += dailyTotals[i - j]; }
+                    movingAverages.push(Math.round(sum7 / 7));
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j <= i; j++) { sum += dailyTotals[j]; }
+                    movingAverages.push(Math.round(sum / (i + 1)));
+                }
+            }
+
+            if (minVol === Number.MAX_VALUE) minVol = 0;
+
+            const daysCount = dailyTotals.filter(t => t > 0).length;
+            const avgVol = daysCount > 0 ? Math.round(runSum / daysCount) : 0;
+
+            // Calculate Ideal Cumulative
+            const idealCumulative = [];
+            let idealSum = 0;
+            for (let i = 0; i < 31; i++) {
+                idealSum += avgVol;
+                idealCumulative.push(idealSum);
+            }
+
+            // Calculate Monthly Trend (H2 vs H1)
+            let firstHalfSum = 0;
+            let secondHalfSum = 0;
+            const midPoint = 15;
+            for(let i=0; i<midPoint; i++) firstHalfSum += dailyTotals[i] || 0;
+            for(let i=midPoint; i<31; i++) secondHalfSum += dailyTotals[i] || 0;
+            
+            if (firstHalfSum > 0) {
+                const trendPct = (((secondHalfSum * (15/16)) - firstHalfSum) / firstHalfSum) * 100; // Normalized for days
+                const trendEl = document.getElementById('kpiTrend');
+                trendEl.textContent = `${trendPct > 0 ? '+' : ''}${trendPct.toFixed(1)}%`;
+                trendEl.className = trendPct > 0 ? 'text-success' : 'text-danger';
+            } else {
+                document.getElementById('kpiTrend').textContent = '-';
+            }
+
+            // Update KPIs
+            document.getElementById('kpiTotal').innerHTML = `${runSum.toLocaleString()} <small class="fs-6 text-muted">BBLS</small>`;
+            document.getElementById('kpiAvg').innerHTML = `${avgVol.toLocaleString()} <small class="fs-6 text-muted">BBLS</small>`;
+            document.getElementById('kpiMax').innerHTML = `${maxVol.toLocaleString()} <small class="fs-6 text-muted">BBLS</small>`;
+            document.getElementById('kpiMaxDay').textContent = `Day ${maxDay}`;
+            document.getElementById('kpiMin').innerHTML = `${minVol.toLocaleString()} <small class="fs-6 text-muted">BBLS</small>`;
+            document.getElementById('kpiMinDay').textContent = `Day ${minDay}`;
+
+            // Build Table
+            let tableHTML = `<thead><tr><th>Dest</th>`;
+            for(let i=1; i<=31; i++) tableHTML += `<th>${i}</th>`;
+            tableHTML += `<th>Total</th></tr></thead><tbody>`;
+
+            const rows = [
+                { name: 'TNP', cls: 'd-tnp', data: tnps },
+                { name: 'INGENTIA', cls: 'd-ing', data: ings },
+                { name: 'ACE', cls: 'd-ace', data: aces },
+                { name: 'INTESSA', cls: 'd-int', data: ints },
+                { name: 'REFINERY', cls: 'd-ref', data: refs }
+            ];
+
+            rows.forEach(r => {
+                if (destSelection === 'ALL' || destSelection === r.name) {
+                    tableHTML += `<tr class="${r.cls}"><td><strong>${r.name}</strong></td>`;
+                    let rTotal = 0;
+                    for(let i=0; i<31; i++) {
+                        tableHTML += `<td>${r.data[i] ? r.data[i].toLocaleString() : '-'}</td>`;
+                        rTotal += r.data[i];
+                    }
+                    tableHTML += `<td><strong>${rTotal.toLocaleString()}</strong></td></tr>`;
+                }
+            });
+
+            tableHTML += `<tr style="background:#e9ecef;"><td><strong>DAILY TOTAL</strong></td>`;
+            for(let i=0; i<31; i++) {
+                const val = dailyTotals[i] || 0;
+                let bgTint = 'transparent';
+                if (val > 0 && maxVol > 0) {
+                    const pct = val / maxVol;
+                    if (pct >= 0.85) bgTint = 'rgba(25, 135, 84, 0.2)'; // Green heat
+                    else if (pct <= 0.4) bgTint = 'rgba(220, 53, 69, 0.2)'; // Red heat
+                }
+                tableHTML += `<td style="background-color: ${bgTint};"><strong>${val ? val.toLocaleString() : '-'}</strong></td>`;
+            }
+            tableHTML += `<td><strong>${runSum.toLocaleString()}</strong></td></tr>`;
+            
+            tableHTML += `</tbody>`;
+            document.getElementById('dailyTable').innerHTML = tableHTML;
+
+            // Update Series
+            const series = [
+                { name: 'TNP', type: 'column', data: tnps },
+                { name: 'INGENTIA', type: 'column', data: ings },
+                { name: 'ACE', type: 'column', data: aces },
+                { name: 'INTESSA', type: 'column', data: ints },
+                { name: 'REFINERY', type: 'column', data: refs },
+                { name: '7-Day MA', type: 'line', data: movingAverages },
+                { name: 'Cumulative Actual', type: 'line', data: cumulativeTotals },
+                { name: 'Ideal Target Path', type: 'line', data: idealCumulative }
+            ];
+            
+            // Annotations for Max, Min, and Weekends
+            const annotations = {
+                points: [],
+                xaxis: [],
+                yaxis: []
+            };
+
+            // Calculate Weekend Bands
+            for (let i = 1; i <= 31; i++) {
+                const d = new Date(year, month - 1, i);
+                if (d.getMonth() + 1 == month) {
+                    if (d.getDay() === 0 || d.getDay() === 6) { // Sun or Sat
+                        annotations.xaxis.push({
+                            x: i,
+                            x2: i + 1,
+                            fillColor: '#000',
+                            opacity: 0.04,
+                            label: { text: '' }
+                        });
+                    }
+                }
+            }
+            
+            if (maxVol > 0) {
+                annotations.points.push({
+                    x: maxDay,
+                    y: maxVol,
+                    marker: { size: 6, fillColor: '#198754', strokeColor: '#fff', radius: 2 },
+                    label: { borderColor: '#198754', style: { color: '#fff', background: '#198754', fontWeight: 600 }, text: `Max: ${maxVol.toLocaleString()}` }
+                });
+            }
+            if (minVol > 0 && minVol < maxVol) {
+                annotations.points.push({
+                    x: minDay,
+                    y: minVol,
+                    marker: { size: 6, fillColor: '#dc3545', strokeColor: '#fff', radius: 2 },
+                    label: { borderColor: '#dc3545', style: { color: '#fff', background: '#dc3545', fontWeight: 600 }, text: `Min: ${minVol.toLocaleString()}` }
+                });
+            }
+            
+            // Add Average Line Annotation
+            if (avgVol > 0) {
+                annotations.yaxis.push({
+                    y: avgVol,
+                    borderColor: '#0d6efd',
+                    borderWidth: 2,
+                    strokeDashArray: 5,
+                    label: {
+                        borderColor: '#0d6efd',
+                        style: { color: '#fff', background: '#0d6efd', fontWeight: 600, padding: { left: 5, right: 5, top: 2, bottom: 2 } },
+                        text: `Daily Avg: ${avgVol.toLocaleString()}`,
+                        position: 'left',
+                        offsetX: 10
+                    }
+                });
+            }
+
+            printChart.updateOptions({ annotations: annotations });
+            printChart.updateSeries(series);
+            
+            // Update Legend display
+            document.querySelectorAll('.legend-item').forEach(el => {
+                if(el.className.includes('d-')) el.style.display = 'none';
+            });
+            rows.forEach(r => {
+                if (destSelection === 'ALL' || destSelection === r.name) {
+                    document.querySelectorAll('.' + r.cls).forEach(el => el.style.display = '');
+                }
+            });
+
+            // Hide Loader
+            if (loader) loader.classList.add('d-none');
+        }
+    </script>
+</body>
+</html>

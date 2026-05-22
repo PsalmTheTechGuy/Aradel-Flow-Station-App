@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Wells - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4 animate-fade-in-up">
+        <div>
+            <h2 class="mb-1 fw-bold gradient-text"><i class="fas fa-industry me-2"></i>Well Management</h2>
+            <p class="text-muted mb-0">Manage all wells in the system</p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addWellModal">
+            <i class="fas fa-plus me-2"></i>Add Well
+        </button>
+    </div>
+
+    <div class="row g-4">
+        {% for w in wells_data %}
+        <div class="col-md-6 col-lg-4 animate-fade-in-up animate-delay-{{ loop.index0 % 4 + 1 }}">
+            <div class="glass-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="w-10 h-10 rounded-circle d-flex align-items-center justify-content-center" style="background: var(--primary-gradient);">
+                            <i class="fas fa-oil-well text-white"></i>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-icon btn-outline-secondary" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#" onclick="editWell({{ w.id }}, '{{ w.name }}', '{{ w.location or '' }}')"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteWell({{ w.id }}, '{{ w.name }}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <h5 class="mb-1 fw-bold">{{ w.name }}</h5>
+                    <p class="text-muted mb-3">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ w.location or 'No location' }}
+                    </p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small">Total Tests</span>
+                            <div class="fw-bold">{{ w.test_count }}</div>
+                        </div>
+                        <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Active</span>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="/tests?well_id={{ w.id }}" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="fas fa-clipboard-list me-2"></i>View Tests
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not wells_data %}
+    <div class="glass-card text-center py-5">
+        <div class="card-body">
+            <div class="w-16 h-16 rounded-circle d-flex align-items-center justify-content-center mx-auto mb-4" style="background: var(--primary-gradient);">
+                <i class="fas fa-oil-well text-white fs-1"></i>
+            </div>
+            <h4>No Wells Found</h4>
+            <p class="text-muted mb-4">Get started by adding your first well</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addWellModal">
+                <i class="fas fa-plus me-2"></i>Add Well
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="addWellModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Well</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addWellForm">
+                    <div class="mb-3">
+                        <label class="form-label">Well Name *</label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., Well-A1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-control" name="location" placeholder="e.g., Field A, Block 5">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveWell()">Save Well</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editWellModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Well</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editWellForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Well Name *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-control" name="location">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateWell()">Update Well</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteWellModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Delete Well</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deleteWellName"></strong>?</p>
+                <p class="text-muted small">This will also delete all associated tests and readings. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Well</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Using global getHeaders() from base.html
+
+async function saveWell() {
+    const form = document.getElementById('addWellForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    const res = await fetch('/api/wells', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+    });
+    
+    if (res.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('addWellModal')).hide();
+        form.reset();
+        showToast('Well created successfully!', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        const result = await res.json();
+        showToast(result.error || 'Failed to create well', 'error');
+    }
+}
+
+function editWell(id, name, location) {
+    const form = document.getElementById('editWellForm');
+    form.id.value = id;
+    form.name.value = name;
+    form.location.value = location;
+    new bootstrap.Modal(document.getElementById('editWellModal')).show();
+}
+
+async function updateWell() {
+    const form = document.getElementById('editWellForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    const res = await fetch(`/api/wells/${data.id}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+    });
+    
+    if (res.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('editWellModal')).hide();
+        showToast('Well updated successfully!', 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        const result = await res.json();
+        showToast(result.error || 'Failed to update well', 'error');
+    }
+}
+
+function deleteWell(id, name) {
+    document.getElementById('deleteWellName').textContent = name;
+    document.getElementById('confirmDeleteBtn').onclick = async function() {
+        const res = await fetch(`/api/wells/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('deleteWellModal')).hide();
+            showToast('Well deleted successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            const result = await res.json();
+            showToast(result.error || 'Failed to delete well', 'error');
+        }
+    };
+    new bootstrap.Modal(document.getElementById('deleteWellModal')).show();
+}
+</script>
+{% endblock %}

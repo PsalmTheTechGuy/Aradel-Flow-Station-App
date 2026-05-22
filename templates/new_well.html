@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Well - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-plus-circle me-2 text-primary"></i>Add New Well
+                </div>
+                <div class="card-body">
+                    <form id="wellForm">
+                        <div class="mb-3">
+                            <label class="form-label">Well Name *</label>
+                            <input type="text" class="form-control" id="well_name" placeholder="e.g., Well-A1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-control" id="well_location" placeholder="e.g., Field Alpha - Block 1">
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('dashboard.index') }}" class="btn btn-light">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary" form="wellForm">
+                        <i class="fas fa-check me-2"></i>Create Well
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('wellForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const data = {
+        name: document.getElementById('well_name').value,
+        location: document.getElementById('well_location').value
+    };
+    try {
+        const response = await fetch('/api/wells', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        
+        const handledRes = await handleResponse(response);
+        if (handledRes && handledRes.ok) {
+            showAlert('Success', 'Well created successfully!');
+            setTimeout(() => {
+                window.location.href = '/new-test';
+            }, 1500);
+        } else if (handledRes) {
+            const result = await handledRes.json();
+            showAlert('Error', result.error || 'Failed to create well');
+        }
+    } catch (error) {
+        showAlert('Error', error.message);
+    }
+});
+</script>
+{% endblock %}

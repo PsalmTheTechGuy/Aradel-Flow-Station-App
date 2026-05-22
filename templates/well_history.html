@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+
+{% block title %}Well History - {{ well.name }} - WellTest Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">
+                <i class="fas fa-history me-2 text-primary"></i>
+                {{ well.name }} Test History
+            </h3>
+            <p class="text-muted mb-0">
+                <i class="fas fa-map-marker-alt me-2"></i>{{ well.location or 'No location' }}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('dashboard.analytics') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Analytics
+            </a>
+            <button class="btn btn-primary" onclick="exportWellData()">
+                <i class="fas fa-download me-2"></i>Export Data
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <div class="text-success fw-bold" style="font-size:2rem;" id="currentGross">0</div>
+                    <div class="text-muted small">Current Gross Rate (BBLS/day)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <div class="text-info fw-bold" style="font-size:2rem;" id="currentBsw">0%</div>
+                    <div class="text-muted small">Current BS&W</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <div class="text-warning fw-bold" style="font-size:2rem;" id="netProd">0</div>
+                    <div class="text-muted small">Net Production (BBLS/day)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-secondary">
+                <div class="card-body text-center">
+                    <div class="text-secondary fw-bold" style="font-size:2rem;" id="testCount">0</div>
+                    <div class="text-muted small">Total Tests</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line me-2"></i>Production Trend Over Time
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>History:</b> Tracks how this specific well has performed over all test dates. Look for drops to spot maintenance needs.
+                    </p>
+                    <canvas id="historyChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-dark">
+                    <i class="fas fa-calculator me-2"></i>Decline Analysis
+                </div>
+                <div class="card-body" id="declineAnalysis">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-tint me-2"></i>Water Cut Trend
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> <b>Water Check:</b> Monitors if water production is increasing over time, which could indicate a need for a well workover.
+                    </p>
+                    <canvas id="bswTrendChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-fire me-2"></i>Net Production vs Water
+                </div>
+                <div class="card-body">
+                    <canvas id="netBswChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-list me-2"></i>Test History Details
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table data-table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Date</th>
+                            <th>Gross Rate</th>
+                            <th>BS&W</th>
+                            <th>Net Prod</th>
+                            <th>Gross BS&W</th>
+                            <th>Readings</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let historyChart, bswTrendChart, netBswChart;
+let historyData = [];
+
+async function loadHistory() {
+    try {
+        const res = await fetch(`/api/analytics/well/{{ well.id }}/history`, {
+            headers: getHeaders()
+        });
+        const handledRes = await handleResponse(res);
+        if (handledRes && handledRes.ok) {
+            const data = await handledRes.json();
+            historyData = data.history;
+            
+            updateSummary(data);
+            updateCharts(data);
+            updateTable(data);
+            updateDecline(data);
+        }
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+}
+
+function updateSummary(data) {
+    if (data.history.length === 0) return;
+    
+    const latest = data.history[0];
+    document.getElementById('currentGross').textContent = latest.avg_gross_rate ? latest.avg_gross_rate.toFixed(3) : 'N/A';
+    document.getElementById('currentBsw').textContent = latest.avg_bsw ? latest.avg_bsw.toFixed(1) + '%' : 'N/A';
+    document.getElementById('netProd').textContent = latest.net_prod ? latest.net_prod.toFixed(3) : 'N/A';
+    document.getElementById('testCount').textContent = data.history.length;
+}
+
+function updateCharts(data) {
+    const history = data.history.reverse();
+    const labels = history.map(h => h.date);
+    
+    const grossRates = history.map(h => h.avg_gross_rate);
+    const bsws = history.map(h => h.avg_bsw);
+    const netProds = history.map(h => h.net_prod);
+    
+    if (historyChart) historyChart.destroy();
+    historyChart = new Chart(document.getElementById('historyChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gross Rate',
+                data: grossRates,
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: { intersect: false, mode: 'index' },
+            scales: {
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Gross Rate' } }
+            }
+        }
+    });
+    
+    if (bswTrendChart) bswTrendChart.destroy();
+    bswTrendChart = new Chart(document.getElementById('bswTrendChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'BS&W %',
+                data: bsws,
+                borderColor: '#0dcaf0',
+                backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { min: 0, max: 100 } }
+        }
+    });
+    
+    if (netBswChart) netBswChart.destroy();
+    netBswChart = new Chart(document.getElementById('netBswChart'), {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Wells',
+                data: history.filter(h => h.avg_gross_rate).map(h => ({
+                    x: h.avg_gross_rate,
+                    y: h.avg_bsw
+                })),
+                backgroundColor: '#6f42c1',
+                pointRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Gross Rate' } },
+                y: { title: { display: true, text: 'BS&W %' } }
+            }
+        }
+    });
+}
+
+function updateTable(data) {
+    const tbody = document.getElementById('historyTableBody');
+    tbody.innerHTML = data.history.map(h => `
+        <tr>
+            <td><span class="badge bg-primary">${h.test_id}</span></td>
+            <td>${h.date}</td>
+            <td class="fw-bold text-success">${h.avg_gross_rate ? h.avg_gross_rate.toFixed(3) : '-'}</td>
+            <td><span class="badge ${h.avg_bsw > 50 ? 'bg-danger' : 'bg-success'}">${h.avg_bsw ? h.avg_bsw.toFixed(1) + '%' : '-'}</span></td>
+            <td class="fw-bold">${h.net_prod ? h.net_prod.toFixed(3) : '-'}</td>
+            <td>${h.gross_bsw ? h.gross_bsw.toFixed(3) : '-'}</td>
+            <td>${h.readings_count}</td>
+            <td>
+                <a href="/tests/${h.test_id ? 'detail' : ''}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-eye"></i>
+                </a>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateDecline(data) {
+    const params = data.decline_analysis;
+    const el = document.getElementById('declineAnalysis');
+    
+    if (params) {
+        el.innerHTML = `
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-arrow-down me-2"></i>Decline Parameters</h6>
+                <hr>
+                <p class="mb-1"><strong>Initial Rate:</strong> ${params.initial_rate.toFixed(2)} BBLS/day</p>
+                <p class="mb-1"><strong>Decline Rate:</strong> ${params.decline_rate.toFixed(4)} /day</p>
+                <p class="mb-1"><strong>Decline Rate:</strong> ${(params.decline_rate * 365 * 100).toFixed(1)}%/year</p>
+                <p class="mb-0"><strong>${params.half_life ? 'Half-life: ' + params.half_life.toFixed(0) + ' days' : 'N/A'}</strong></p>
+            </div>
+            <div class="alert alert-info mt-2">
+                <small>Production is expected to ${params.decline_rate > 0 ? 'decline' : 'stabilize'} over time based on exponential decline model.</small>
+            </div>
+        `;
+    } else {
+        el.innerHTML = '<div class="alert alert-secondary">Insufficient data for decline analysis. Need at least 2 tests.</div>';
+    }
+}
+
+function exportWellData() {
+    window.location.href = `/api/export/well/{{ well.id }}/history/csv`;
+}
+
+document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+{% endblock %}
